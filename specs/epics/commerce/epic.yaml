@@ -1,0 +1,34 @@
+# The epic's declaration. metadata.name equals the directory name; metadata.key
+# is the task-key prefix this epic reserves (CM → CM-1, CM-2, …). Owner, target
+# date and health are the platform's — never written here.
+apiVersion: orun.io/v1
+kind: Epic
+metadata:
+  name: commerce
+  key: CM
+spec:
+  title: "Vercel's Next.js Commerce on Cloudflare Workers"
+  summary: "Vercel's Next.js Commerce — the Shopify headless storefront: server components over the Storefront API, server-action cart, `\"use cache\"` data with tag revalidation from Shopify webhooks — runs on Cloudflare Workers + Static Assets through @opennextjs/cloudflare, with the Next.js data cache in an R2 bucket provisioned by Terraform through Orun and the tag cache and revalidation queue in Durable Objects the Worker itself exports. The Shopify Storefront API stays the backend, reached with Worker secrets; nothing in the storefront's code changes beyond what Workers and Next 16 force."
+  state: draft
+  milestones:
+    - name: "CM0 — the spec"
+      exitCriteria:
+        - "the doc set and the task contracts are on main"
+      tasks: [CM-1]
+    - name: "CM1 — the storefront on Workers"
+      exitCriteria:
+        - "apps/web is the upstream template, built by `next build` + `opennextjs-cloudflare build` with R2 + Durable Objects as the Next.js cache"
+        - "the wrangler config renders per environment from the cloudflare-r2 root's wiring document (fixture in verify, live in deploy)"
+        - "`pnpm typecheck`, `pnpm lint`, `pnpm test` and `pnpm build` are green on main (Checks)"
+        - "`wrangler dev` serves the storefront, its static assets and the OG image, and /api/revalidate enforces the webhook secret and revalidates the products/collections tags"
+      tasks: [CM-2]
+    - name: "CM2 — the cache infrastructure from Terraform"
+      exitCriteria:
+        - "infra/terraform/cloudflare-r2 provisions the stage and prod buckets and publishes the wiring document as an orun secret"
+        - "the app component depends on the root and declares the wiring it reads"
+      tasks: [CM-3]
+    - name: "CM3 — ready to instantiate"
+      exitCriteria:
+        - "the README says how to run, test, preview and deploy it through Orun, how Shopify is connected (secrets, menus, collections, the revalidation webhook) and what the first deploy serves"
+        - "the as-built status records every departure from the upstream template"
+      tasks: [CM-4]

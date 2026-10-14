@@ -1,0 +1,14 @@
+apiVersion: orun.io/v1
+kind: TaskContract
+spec:
+  goal: The R2 bucket that holds the Next.js incremental cache is provisioned per environment by Terraform through Orun and the app component reads its name from the wiring document
+  affects:
+    - infra/terraform/cloudflare-r2
+    - apps/web/component.yaml
+    - apps/web/wiring.fixture.json
+    - apps/web/wrangler.template.jsonc
+    - intent.yaml
+  doneWhen:
+    - terraform validate passes on infra/terraform/cloudflare-r2
+    - the component's secretEnv names match the root's secretOutputs and the fixture's keys match the template's tokens
+  gates: []
