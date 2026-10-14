@@ -1,0 +1,76 @@
+apiVersion: sourceplane.io/v1
+kind: Component
+metadata:
+  name: web
+  description: The Next.js Commerce storefront (Next.js on Cloudflare Workers + Static Assets via @opennextjs/cloudflare, per environment; R2 + Durable Objects as the Next.js cache)
+spec:
+  type: cloudflare-workers-assets-turbo
+  lifecycle: production
+  owner: platform
+  domain: web
+  path: apps/web
+  # Its own lane per environment: the Next.js build is the longest job in the
+  # plan, and a shared lane would wait on it.
+  lane: isolated
+  # The R2 bucket is the Worker's incremental cache: its name is rendered into
+  # wrangler.jsonc from the root's wiring document before the build. The
+  # Durable Objects (tag cache, revalidation queue) need no root — the Worker
+  # exports their classes and the migration creates them on deploy.
+  dependsOn:
+    - component: cloudflare-r2
+  secretEnv:
+    WIRING_CLOUDFLARE_R2_STAGE: "secret://commerce/commerce/stage/WIRING_CLOUDFLARE_R2"
+    WIRING_CLOUDFLARE_R2_PROD: "secret://commerce/commerce/prod/WIRING_CLOUDFLARE_R2"
+  subscribe:
+    environments:
+      - name: dev
+        profile: verify
+      - name: stage
+        profile: verify
+        profileRules:
+          - profile: deploy
+            when:
+              triggerRef: github-push-main
+      - name: prod
+        profile: verify
+        profileRules:
+          - profile: deploy
+            when:
+              triggerRef: github-push-main
+  parameters:
+    nodeVersion: "22"
+    pnpmVersion: "10.12.1"
+
+    workspaceDir: ../..
+    appDir: .
+
+    turboFilter: "@app/web"
+    wranglerConfig: wrangler.jsonc
+
+    # @opennextjs/cloudflare emits a Worker entrypoint plus a static-assets
+    # directory bound via ASSETS — both deploy in one `wrangler deploy`.
+    workerEntrypoint: .open-next/worker.js
+    assetsDir: .open-next/assets
+
+    # Per-env worker name: commerce-web-{dev,stage,prod}. The rendered
+    # wrangler.jsonc names the same Worker (its self-reference binding needs it).
+    workerName: commerce-web
+    environmentAwareWorkerName: true
+
+    # The account's workers.dev subdomain; exported to the smoke step as
+    # ${WORKERS_DEV_SUBDOMAIN} and used to build ${DEPLOYED_URL}.
+    workersDevSubdomain: your-workers-subdomain
+
+    installCommand: pnpm install --frozen-lockfile
+    # Render this environment's wrangler config from the wiring document, then
+    # build (the verify lane already rendered from the fixture through
+    # `wire:fixture`; a deploy lane re-renders with the real values).
+    buildCommand: node ../../tooling/wire/live.mjs --template wrangler.template.jsonc --out wrangler.jsonc --components cloudflare-r2 --env "${ORUN_ENVIRONMENT}" && pnpm exec turbo run build --filter=@app/web
+
+    # Smoke: the home page renders and carries the site name.
+    smokeCommand: 'html=$(curl -sfL "${DEPLOYED_URL}/") && echo "${html}" | grep -q ''Next.js Commerce'''
+  labels:
+    team: platform
+    layer: delivery
+    surface: web
+    runtime: cloudflare

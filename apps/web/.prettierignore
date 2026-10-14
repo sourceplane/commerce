@@ -1,0 +1,9 @@
+# Build output and the rendered wrangler config (the template is checked).
+.next
+.open-next
+.wrangler
+.turbo
+node_modules
+wrangler.jsonc
+next-env.d.ts
+*.tsbuildinfo

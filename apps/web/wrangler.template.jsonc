@@ -1,0 +1,61 @@
+// Rendered to wrangler.jsonc (git-ignored) by tooling/wire: the verify lane
+// renders from wiring.fixture.json, the deploy lane from the wiring document
+// the `cloudflare-r2` Terraform root lease-publishes (WIRING_CLOUDFLARE_R2_<ENV>).
+// The workers-assets composition deploys one environment per job with no
+// wrangler `--env`, so `__ENV__` names the environment this config is rendered
+// for. The Worker's name carries it (commerce-web-stage, commerce-web-prod —
+// the composition's `workerName` + environment) because the self-reference
+// service binding below must name exactly the Worker it runs in.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "commerce-web-__ENV__",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "observability": { "enabled": true },
+  // Non-secret storefront facts, read through process.env exactly as upstream
+  // reads them on Vercel. SITE_URL stands in for Vercel's
+  // VERCEL_PROJECT_PRODUCTION_URL (metadataBase, robots, sitemap). The Shopify
+  // store domain, Storefront token and webhook secret are Worker secrets, set
+  // once per environment (see .dev.vars.example and the README).
+  "vars": {
+    "COMPANY_NAME": "Vercel Inc.",
+    "SITE_NAME": "Next.js Commerce",
+    "SITE_URL": "https://commerce-web-__ENV__.your-workers-subdomain.workers.dev",
+  },
+  // The Next.js incremental cache — pre-rendered pages and `"use cache"`
+  // entries — in the bucket infra/terraform/cloudflare-r2 provisions.
+  "r2_buckets": [
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "@@wiring(cloudflare-r2/__ENV__:r2_bucket_name)@@",
+    },
+  ],
+  // The tag cache (which tags `revalidateTag` invalidated, and when) and the
+  // revalidation queue: Durable Objects the generated Worker exports, created
+  // by the migration on first deploy.
+  "durable_objects": {
+    "bindings": [
+      { "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" },
+      {
+        "name": "NEXT_TAG_CACHE_DO_SHARDED",
+        "class_name": "DOShardedTagCache",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["DOQueueHandler", "DOShardedTagCache"],
+    },
+  ],
+  // The queue revalidates a stale route by requesting it from the Worker
+  // itself.
+  "services": [
+    { "binding": "WORKER_SELF_REFERENCE", "service": "commerce-web-__ENV__" },
+  ],
+}
