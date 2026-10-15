@@ -95,9 +95,12 @@ export async function updateItemQuantity(
   }
 }
 
+// Shopify's hosted checkout when a store is connected; without one (or with
+// no cart yet) the storefront's own /checkout, which asks for a payment
+// provider instead of failing.
 export async function redirectToCheckout() {
   let cart = await getCart();
-  redirect(cart!.checkoutUrl);
+  redirect(cart?.checkoutUrl || "/checkout");
 }
 
 export async function createCartAndSetCookie() {

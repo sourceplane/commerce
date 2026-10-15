@@ -27,6 +27,6 @@ crash.log
 **/.orun/runs/
 **/.orun/
 
-# Rendered wrangler configs for wiring-templated deployables (committed as
-# wrangler.template.jsonc; rendered by tooling/wire at verify/deploy time).
-apps/web/wrangler.jsonc
+# apps/web/wrangler.jsonc is NOT ignored: it is committed as the fixture render
+# of wrangler.template.jsonc, because the deploy lane checks the config exists
+# before it builds (and re-renders it for its environment in the build).

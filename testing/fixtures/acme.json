@@ -1,0 +1,23 @@
+{
+  "_comment": [
+    "The inputs the placement, leak and e2e gates render with. Acme is not a",
+    "real store and never becomes one: this tree is placed into a temp",
+    "directory, asserted against, and deleted. The values are chosen to be",
+    "AWKWARD rather than tidy — a store name with an apostrophe and an",
+    "ampersand (both legal in the card's pattern, both special in TypeScript",
+    "strings and HTML), a hyphenated repo slug that CONTAINS this baseline's",
+    "own slug (`commerce`, an English word the rename must not chase twice),",
+    "an owner other than the baseline's, and a multi-label domain — because a",
+    "fixture that only uses values the templates were written against proves",
+    "the templates work on the values they were written against.",
+    "Every key here is an input repo-blueprint.yaml declares. A key it does not",
+    "declare is a fixture that has drifted, and orun refuses it."
+  ],
+  "reponame": "acme-commerce",
+  "productname": "Sam's Tees & Mugs",
+  "productdomain": "shop.acme.dev",
+  "githuborg": "acme-inc",
+  "subdomain": "acme",
+  "orunWorkspace": "ws_0000000000000000000000000000000f",
+  "epicSlug": "commerce-baselining"
+}

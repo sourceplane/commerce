@@ -1,5 +1,8 @@
 apiVersion: orun.io/v1
 kind: TaskContract
+metadata:
+  name: CM-3
+  title: "The cache infrastructure from Terraform"
 spec:
   goal: The R2 bucket that holds the Next.js incremental cache is provisioned per environment by Terraform through Orun and the app component reads its name from the wiring document
   affects:

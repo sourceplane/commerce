@@ -9,12 +9,14 @@ the code departed from `design.md` or from the upstream template.
 | CM1 — the storefront on Workers | ✅ Shipped | [#2](https://github.com/sourceplane/commerce/pull/2) |
 | CM2 — the cache infrastructure from Terraform | ✅ Shipped (validated; apply gated on a linked workspace) | [#3](https://github.com/sourceplane/commerce/pull/3) |
 | CM3 — ready to instantiate | ✅ Shipped | [#4](https://github.com/sourceplane/commerce/pull/4) |
+| CM4 — a baseline, in one landing | ✅ Shipped (offline-proven; no live bootstrap yet, risk CM-P) | this PR (CM-5), to be tagged `baseline-v1` |
 
 ## Departures from the upstream template
 
 Upstream is [vercel/commerce](https://github.com/vercel/commerce) at
-`3761e52` (2026-06-10). `app/`, `components/` and `lib/` are byte-identical
-to it except for the four files named below.
+`3761e52` (2026-06-10). Through CM3, `app/`, `components/` and `lib/` were
+byte-identical to it except for the four files named below; CM4's changes
+follow them, under "Departures from the port (CM4)".
 
 ### `next.config.ts`: `experimental.useCache`, not `experimental.ppr` + `useCache`
 
@@ -89,7 +91,106 @@ exports (`/config`, `/overrides/*`), which `open-next.config.ts` imports.
 | react, react-dom | ^19.2.1 | Next 16 peer range (upstream 19.0.0) |
 | typescript, tailwindcss, @tailwindcss/postcss, prettier | upstream's pins | unchanged |
 
-## Verified
+## Departures from the port (CM4)
+
+### A storefront with no store: the demo catalogue
+
+| What | Before | After | Why |
+|---|---|---|---|
+| `lib/shopify/index.ts` | each reader `"use cache"`d, guarded by "Shopify not configured" → empty (some unguarded → 500) | each export a switch: `isShopifyConfigured()` → the upstream reader (renamed `shopify*`, body unchanged, formatted) or `lib/demo`; `isShopifyConfigured` exported | a fresh build must render with no third-party key (risk CM-N); the switch is outside `"use cache"` so no demo answer outlives a connected store |
+| `lib/demo/` | — | the catalogue (6 products, variants, one sold out; 4 collections incl. the two `hidden-homepage-*`; 2 menus; 2 pages) and a cookie cart priced from it | the same |
+| `public/demo/*.svg` | — | seven product images, served as static assets (next/image leaves SVGs unoptimised) | no third-party image host |
+| `app/cart/page.tsx` | — (the cart was the client-only modal) | the cart rendered on the server; checkout is a plain form post to `redirectToCheckout` | "cart" as a route that renders without JavaScript |
+| `app/checkout/page.tsx` | — | Shopify connected: forwards to the cart's checkout; else 200, "Connect a payment provider to enable checkout" | checkout without a payment provider is a notice, not a 500 |
+| `components/cart/actions.ts` `redirectToCheckout` | `redirect(cart!.checkoutUrl)` | `redirect(cart?.checkoutUrl \|\| "/checkout")` | a missing cart threw |
+| `components/demo-banner.tsx`, `app/layout.tsx` | — | a banner on every page while no store is connected | the demo says it is one |
+| `components/welcome-toast.tsx` | "Welcome to Next.js Commerce", "Deploy your own" → vercel.com | the store's name; the source link | identity, and the demo mention |
+| `app/[page]/opengraph-image.tsx`, `app/search/[collection]/opengraph-image.tsx` | `params.page` read synchronously | `await params` | Next 16 passes image-route params as a Promise; every such image was a 500 |
+| `components/opengraph-image.tsx` | a missing title rendered blank | falls back to the store's name | an image for a page that does not exist yet |
+
+### Identity, origin and the baseline's wiring
+
+| What | Before | After | Why |
+|---|---|---|---|
+| the store's name | `SITE_NAME` wrangler var read through `process.env` (navbar, footer, layout, logo, OG image) | `SITE_NAME` in `app/site.ts` | the rename seam; any name the card admits stays a valid string |
+| the source link | footer: github.com/vercel/… and "Deploy" → vercel.com/templates/…, "Created by ▲ Vercel" | `SOURCE_URL` in `app/site.ts`; "Runs on Cloudflare Workers" | upstream URLs contain the slug, which the rename would rewrite (risk CM-O) |
+| `SITE_URL`, `baseUrl` | wrangler var → `metadataBase`, robots, sitemap | removed; `requestOrigin(headers)` | no configured origin; workers.dev, a custom domain and `wrangler dev` all right |
+| `app/sitemap.ts` | `validateEnvironmentVariables()` → 500 without a store | removed from the sitemap | the sitemap lists the demo catalogue too |
+| wrangler `vars` | `COMPANY_NAME`, `SITE_NAME`, `SITE_URL` | none (`COMPANY_NAME` optional, documented) | the seam and the request origin replace them |
+| `apps/web/wrangler.jsonc` | git-ignored, rendered by the build | committed as the fixture render, GENERATED banner; Checks diffs it | risk CM-J |
+| dev's render | `live.mjs --env dev` → no document → red | `--fixture wiring.fixture.json --fixture-envs dev`; the fixture has a `dev` entry | risk CM-K |
+| `apps/web` → `cloudflare-r2` | `dependsOn` in the default mode | `mode: enforced`, `modeRules` advisory on `github-pull-request` | the one landing's order on main; a PR deploys nothing |
+| the R2 root's token | `CLOUDFLARE_API_TOKEN` (`workers-deploy`: no R2) | `CLOUDFLARE_R2_TOKEN` (`r2-data`), bound as the provider's `CLOUDFLARE_API_TOKEN` | risk CM-L |
+| `apps/web` smoke | `grep 'Next.js Commerce'` on `/` | `/` answers and `/robots.txt` names the origin it was asked on | the name is the owner's; robots.txt proves the Worker rendered it, whatever the backend |
+| `ci.yml` gate | `vars.ORUN_CI == 'true'` | skip only while `intent.yaml` names `ws_CHANGE_ME` | a bootstrap cannot set a repository variable |
+| `checks.yml` | push to main + PRs | PRs + `workflow_dispatch` | `orun.run/watch@v1` takes the newest run on the merge sha from ANY workflow |
+| stack-tectonic | 0.18.2 | 0.19.0 | first-deploy retry and smoke backoff; not 0.20.0 (Next 16's Turbopack) |
+| orun lane pin | v2.78.0 | v2.78.4 | the sibling baselines' pin |
+| `packages/` | absent — `orun plan` failed on the discovery root | `packages/.gitkeep` | the discovery roots are required |
+| `intent.yaml` docs pages | `specs/epics/…` | `ai/context/*` | the pages must exist in a product |
+| `apps/web/.dev.vars.example` | the three Shopify secrets | folded into `.env.example` | the blueprint's `ignore` drops `**/.dev.vars.*`, so it could not ship |
+| `apps/web/README.md` | upstream's (Deploy with Vercel, provider list) | the app's, crediting the upstream by description | it ships, and its URLs spell the slug (CM-O) |
+| `tasks/CM-1..4` | no `metadata` | `metadata.name` and `title` | `orun work check` (≥ v2.79) refused them |
+
+## Verified (CM4)
+
+- `orun new --status` reads the blueprint at v2.58.11 (the bootstrap floor),
+  v2.78.4 (the lane pin) and v2.79.0: `01-product` 140 files, `02-docs`
+  hook-only. `orun validate` and `orun work check` clean.
+- `testing/{manifest,phases,coverage,rebrand,retouch,bootstrap-defer,wire}.test.sh`
+  green — the card's three secrets (`CLOUDFLARE_API_TOKEN`/`workers-deploy`,
+  `CLOUDFLARE_R2_TOKEN`/`r2-data`, `CLOUDFLARE_ACCOUNT_ID`/`account-id`)
+  against the reconcile hooks; the rename's 34 cases, the two slug hazards
+  among them.
+- `testing/leak.test.sh` (v2.58.11 and v2.79.0): 140 files derived; nothing
+  of the factory, nothing local or built, no provenance prose; 133 shipped
+  sources name no factory path, and none spells the slug outside an identity
+  form.
+- `testing/placement.test.sh` (v2.78.4 and v2.79.0; refused under v2.58.11 by
+  design, risk CM-Q), fixture "Sam's Tees & Mugs" / `acme-inc/acme-commerce`
+  — a slug that contains this baseline's: two landings; rebrand `--verify`
+  clean; the store's name and source link, the Worker and its self-reference
+  binding, the bucket names and every secret ref the product's; no file
+  names a factory path; re-tenanted, `work:` stripped, promotion and dev
+  lanes restored; record rendered. The product's own
+  `orun plan --trigger github-push-main` for the 01-product merge:
+
+  | job | profile | lane level | waits on | token |
+  |---|---|---|---|---|
+  | `cloudflare-r2.stage.terraform` | `terraform.apply` | 0 | — | `CLOUDFLARE_R2_TOKEN` |
+  | `cloudflare-r2.prod.terraform` | `terraform.apply` | 0 | — | `CLOUDFLARE_R2_TOKEN` |
+  | `web.stage.verify-deploy` | `cloudflare-workers-assets-turbo.deploy` | 1 | `cloudflare-r2.stage.terraform` | `CLOUDFLARE_API_TOKEN` |
+  | `web.prod.verify-deploy` | `cloudflare-workers-assets-turbo.deploy` | 1 | `cloudflare-r2.prod.terraform` | `CLOUDFLARE_API_TOKEN` |
+
+  On a pull request `web` waits on nothing; the 02-docs merge plans 0 jobs;
+  `--resume` changes nothing.
+- `testing/e2e.test.sh` (v2.78.4 and v2.79.0): the 01-product landing passes
+  the Checks sequence (the committed config is the fixture render); in the
+  job tree staged as orun stages it, the stage lane's `verify-app-structure`,
+  `build-app` (the live render, from a stage document in the job's
+  environment), `verify-build-output` and `deploy-dry-run` pass, binding
+  `NEXT_INC_CACHE_R2_BUCKET` to the document's bucket beside the Durable
+  Object and self-reference bindings; `wrangler dev` serves the built Worker
+  (a local bucket, local Durable Objects, NO Shopify key); the component's
+  own smoke passes; the home page carries the product's name, its source
+  link, the demo banner and the demo catalogue; a shopper browses to the
+  first featured product, picks its options, adds it to the cart twice
+  through the build's own `addItem` server action, sees two on `/cart`,
+  proceeds to checkout with the plain form post and lands on `/checkout`'s
+  "Connect a payment provider to enable checkout" (200); search, a
+  collection, a page, robots.txt and the sitemap on the asked origin, the Open
+  Graph images, the demo's static assets and two 404s answer as promised.
+- The repository's own Checks sequence (install, `wire:fixture` + `git diff
+  --exit-code`, typecheck, lint, test — 6 files, 33 tests — build) green on
+  Node 22.
+- `terraform validate` green on `infra/terraform/cloudflare-r2` (1.15.3).
+  The root's plan needs the Cloudflare API (`adopt.tf`), so offline it is
+  held to `validate`.
+- Not verified: a live bootstrap against a workspace — the tokens minted, the
+  bucket applied, the Worker deployed with its R2 binding (risk CM-M), the
+  probes — and the storefront against a real Shopify store (risk CM-P).
+
+## Verified (CM1–CM3)
 
 - Local: `pnpm run wire:fixture`, `pnpm typecheck`, `pnpm lint` (warnings
   only), `pnpm test` (22 tests), `pnpm build` green on Node 25;

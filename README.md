@@ -1,31 +1,74 @@
 # commerce
 
-Vercel's [Next.js Commerce](https://github.com/vercel/commerce) — the Shopify
-headless storefront: server components over the Storefront API, a
-server-action cart, `"use cache"` data revalidated from Shopify webhooks —
-running on **Cloudflare Workers + Static Assets** through
+Vercel's [Next.js Commerce](https://github.com/vercel/commerce) — the headless
+storefront: server components over a store API, a server-action cart,
+`"use cache"` data revalidated from Shopify webhooks — running on **Cloudflare
+Workers + Static Assets** through
 [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare), with the
 Next.js data cache in an **R2 bucket** provisioned by Terraform through
 [Orun](https://github.com/sourceplane/orun) and the tag cache and revalidation
-queue in **Durable Objects** the Worker itself exports, inside the repository
-conventions of the [Cirrus baseline](https://github.com/sourceplane/cirrus-baseline).
+queue in **Durable Objects** the Worker itself exports — and packaged as an
+**Orun baseline**: one command takes a new storefront from nothing to live on
+stage and prod, in its own repository, under its own name, in ONE landing.
 
-The template's code is the code. What the port adds is the Workers build, the
-cache bindings, the monorepo wrapper, a test package for the Shopify client
-and the webhook, the R2 Terraform root, and the deploy contract that threads
-the bucket into the Worker per environment. See
+A fresh build needs no third-party key: until its owner connects a Shopify
+store, the storefront serves a **bundled demo catalogue** (six products, two
+collections, menus, pages) with a cookie cart, and checkout answers with a
+"connect a payment provider" notice rather than an error. See
 [`specs/epics/commerce`](specs/epics/commerce/README.md) for the design, the
 milestones and the as-built status.
 
-## What is here
+## Instantiating a product
+
+```bash
+git clone --depth 1 --branch <baseline-tag> https://github.com/sourceplane/commerce
+cd commerce
+orun new --blueprint repo-blueprint.yaml --out ~/sites/acme-shop --run-hooks --resume \
+  --set reponame=acme-shop --set productname="Acme Shop" --set productdomain=shop.acme.dev \
+  --set githuborg=acme-inc --set subdomain=<workers-dev-subdomain>
+```
+
+Or, once the platform's registry lists it, from the Orun console (Baselines →
+`commerce` → Build). Two phases: **`01-product`** creates the repository and
+lands the whole product as ONE pull request — intent, CI, tooling, the R2
+root, the storefront and its tests — and one convergence applies the R2
+bucket on stage and prod and then deploys the storefront bound to it;
+**`02-docs`** records the live deployment from probed facts.
+**[BOOTSTRAP.md](BOOTSTRAP.md)** is the operator guide;
+[docs/phases/](docs/phases/README.md) has a page per phase.
+
+The new repository receives the **product only** — the app, its R2 root, its
+tests, its CI, its tooling, a README of its own and its operating contract —
+renamed throughout to the product's name, repository, Cloudflare Worker and
+bucket names. None of this repository's machinery ships. Its owner then
+connects Shopify with three Worker secrets (the product's README, "Connecting
+Shopify"); the card asks for no Shopify key, because the platform does not
+broker one.
+
+| What makes it a baseline | Where |
+|---|---|
+| The console card (inputs, secrets, programme) | `blueprint.yaml` |
+| The build document (modules, phases, hooks) | `repo-blueprint.yaml` |
+| This tree's identity, and the bootstrap's task contracts | `.baseline/` |
+| The rename engine | `tooling/rebrand/rebrand.mjs` |
+| The bootstrap's helpers (deferrals, redeploy marker, work-tree strip) | `tooling/bootstrap/` |
+| The deployment-record renderer | `hooks/render-deployment-docs.sh` |
+| The product's README and context pack | `.baseline/product/README.md`, `ai/context/` |
+| The baseline's tests: contract, wiring, leak, offline bootstrap, end to end | `testing/`, `.github/workflows/baseline.yml` |
+| Cutting a `baseline-vN` tag | `.github/workflows/tag.yml` |
+
+## What is here (the product)
 
 | Surface | Where |
 |---|---|
-| Home, `/search`, `/search/[collection]`, `/product/[handle]`, `/[page]`, OG images, sitemap, robots | `apps/web/app` |
-| The Shopify client (`"use cache"` readers, cart mutations, the webhook's `revalidate`) | `apps/web/lib/shopify` |
+| Home, `/search`, `/search/[collection]`, `/product/[handle]`, `/cart`, `/checkout`, `/[page]`, OG images, sitemap, robots | `apps/web/app` |
+| The store's name and source link | `apps/web/app/site.ts` |
+| The Shopify client (`"use cache"` readers, cart mutations, the webhook's `revalidate`) and the demo switch | `apps/web/lib/shopify` |
+| The demo catalogue and the cookie cart | `apps/web/lib/demo`, `apps/web/public/demo` |
 | Cart (server actions, optimistic context, modal), navbar, grid, product gallery | `apps/web/components` |
-| Workers build, cache bindings and deploy contract | `apps/web/next.config.ts`, `apps/web/open-next.config.ts`, `apps/web/wrangler.template.jsonc`, `apps/web/component.yaml` |
+| Workers build, cache bindings and deploy contract | `apps/web/next.config.ts`, `open-next.config.ts`, `wrangler.template.jsonc` + `wiring.fixture.json` (→ the committed `wrangler.jsonc`), `component.yaml` |
 | The R2 bucket (stage, prod) | `infra/terraform/cloudflare-r2` |
+| The wrangler renderer | `tooling/wire` |
 | Tests | `tests/web` (vitest) |
 
 ## Getting started
@@ -39,19 +82,15 @@ pnpm test
 pnpm build              # next build + opennextjs-cloudflare build → apps/web/.open-next
 ```
 
-To run against a Shopify store, put its facts in `apps/web/.env.local` for
-Next's dev server (see `apps/web/.env.example`) and in `apps/web/.dev.vars`
-for the Worker preview (see `apps/web/.dev.vars.example`), then:
-
 ```bash
 pnpm --filter @app/web dev        # http://localhost:3000, Next's dev server
-pnpm --filter @app/web preview    # wrangler dev over the built Worker, with a local R2 bucket and local Durable Objects
+pnpm --filter @app/web preview    # wrangler dev over the built Worker, a local R2 bucket and local Durable Objects
 ```
 
-Without a store the storefront renders its un-configured state (no products,
-no menus), exactly as upstream does before its Shopify integration is
-connected; `/search`, `/[page]` and `/sitemap.xml` surface upstream's error
-for a missing store.
+Without Shopify facts in the environment both serve the demo catalogue. To
+run against a store, put its facts in `apps/web/.env.local` for Next's dev
+server and in `apps/web/.dev.vars` for the Worker preview (both from
+`apps/web/.env.example`).
 
 ## How it maps to Vercel
 
@@ -61,63 +100,39 @@ for a missing store.
 | Data Cache: `"use cache"` entries with `cacheLife("days")` | The R2 bucket bound as `NEXT_INC_CACHE_R2_BUCKET`, written at request time |
 | Tag revalidation: `revalidateTag` from the Shopify webhook, `updateTag` from cart actions | A sharded Durable Object tag cache (`NEXT_TAG_CACHE_DO_SHARDED`) consulted on every cache read |
 | Stale-while-revalidate (ISR) | A Durable Object queue (`NEXT_CACHE_DO_QUEUE`) that re-renders stale routes through the Worker's `WORKER_SELF_REFERENCE` binding |
-| `next/image` over `cdn.shopify.com` | The Worker's own `/_next/image`: validated against `remotePatterns`, served unoptimised (no `IMAGES` binding; Shopify's CDN already sizes) |
-| Project env vars in the dashboard | `COMPANY_NAME`, `SITE_NAME`, `SITE_URL` as wrangler `vars`; `SHOPIFY_STORE_DOMAIN`, `SHOPIFY_STOREFRONT_ACCESS_TOKEN`, `SHOPIFY_REVALIDATION_SECRET` as Worker secrets |
-| `VERCEL_PROJECT_PRODUCTION_URL` | The `SITE_URL` var (metadata base, robots, sitemap) |
-| Deploy on push | Orun deploys `commerce-web-{stage,prod}` on merge to `main` (`apps/web/component.yaml`) |
+| `next/image` over `cdn.shopify.com` | The Worker's own `/_next/image`, validated against `remotePatterns`, served unoptimised; the demo's SVGs are static assets |
+| The Shopify integration's env vars | `SHOPIFY_STORE_DOMAIN`, `SHOPIFY_STOREFRONT_ACCESS_TOKEN`, `SHOPIFY_REVALIDATION_SECRET` as Worker secrets — and, unset, the bundled demo catalogue instead of an empty store |
+| `VERCEL_PROJECT_PRODUCTION_URL` | Nothing: metadata, robots and the sitemap are built on the request's origin (`app/site.ts`) |
+| Deploy on push | Orun applies the bucket and deploys `<repo>-web-{stage,prod}` on merge to `main` (`apps/web/component.yaml`) |
+| "Deploy with Vercel" (clone the template) | `orun new --blueprint repo-blueprint.yaml` — a new repository, branded, deployed |
 
-Partial prerendering is off: `@opennextjs/cloudflare` 1.20 cannot run Next
-16's Cache Components on workerd yet, so the storefront keeps upstream's
+Partial prerendering is off: `@opennextjs/cloudflare` 1.20 cannot run Next 16's
+Cache Components on workerd yet, so the storefront keeps upstream's
 `"use cache"` directives through `experimental.useCache` and renders every
-route at request time — which is what upstream's root-layout cart promise
-made it do anyway.
+route at request time.
 
-## Connecting Shopify
+## How the bucket reaches the Worker
 
-Follow Vercel's [Shopify integration guide](https://vercel.com/docs/integrations/ecommerce/shopify)
-for the store side — a Headless (Storefront API) access token, the
-`next-js-frontend-header-menu` and `next-js-frontend-footer-menu` menus, the
-`hidden-homepage-featured-items` and `hidden-homepage-carousel` collections —
-then give each environment's Worker the three facts as secrets (once; the
-deploy lane does not set them):
-
-```bash
-cd apps/web
-for env in stage prod; do
-  wrangler secret put SHOPIFY_STORE_DOMAIN            --name commerce-web-$env   # your-store.myshopify.com
-  wrangler secret put SHOPIFY_STOREFRONT_ACCESS_TOKEN --name commerce-web-$env
-  wrangler secret put SHOPIFY_REVALIDATION_SECRET     --name commerce-web-$env   # any long random string
-done
+```
+infra/terraform/cloudflare-r2 ──apply (r2-data token)──► orun secret WIRING_CLOUDFLARE_R2 (stage, prod)
+                                               │   (the landing's await checks it exists)
+                                               ▼
+apps/web  dependsOn cloudflare-r2 (enforced on main) · secretEnv WIRING_CLOUDFLARE_R2_<ENV>
+  build:  tooling/wire/live.mjs → wrangler.jsonc with the environment's bucket name
+          (dev, verify-only, renders the fixture) → next build → opennextjs-cloudflare
+  deploy: workers-deploy token → <repo>-web-<env>, its Durable Objects migrated on first deploy
 ```
 
-Then register a webhook in Shopify (Settings → Notifications → Webhooks) for
-`products/create`, `products/update`, `products/delete`,
-`collections/create`, `collections/update` and `collections/delete`, pointing
-at `https://commerce-web-prod.<subdomain>.workers.dev/api/revalidate?secret=<SHOPIFY_REVALIDATION_SECRET>`.
-Each delivery revalidates the `products` or `collections` tag in the Durable
-Object tag cache; the next request re-renders from Shopify. Set `SITE_URL`
-in `apps/web/wrangler.template.jsonc` to the public origin once you know it.
+`wrangler.jsonc` is committed as the fixture render of
+`wrangler.template.jsonc`, because the deploy lane's `verify-app-structure`
+step checks the config exists before it builds; Checks fails if the two
+disagree.
 
-## Deploying
+## CI
 
-`.github/workflows/checks.yml` runs install, wire, typecheck, lint, test and
-build on every push and pull request. `ci.yml` is the Orun pipeline: set
-`execution.state.workspace` in `intent.yaml` to this product's workspace
-(`orun cloud link`), connect Cloudflare to that workspace, and set the
-`ORUN_CI` repository variable to `true`. A merge to `main` then applies the
-R2 root, renders `wrangler.jsonc` from its wiring document, builds the app
-and deploys the Worker to `stage`, then `prod`; the Durable Objects are
-created by the migration in the wrangler config on the first deploy.
-
-The first deploy serves everything on demand: the build pre-renders only
-`/robots.txt`, `/favicon.ico` and `/opengraph-image`, every storefront route
-is dynamic, and every `"use cache"` entry is written to R2 by the first
-request that needs it. Uploading the build's pre-rendered output to the
-bucket is therefore optional —
-
-```bash
-pnpm --filter @app/web exec opennextjs-cloudflare populateCache remote   # needs CLOUDFLARE_API_TOKEN / account, and wrangler.jsonc rendered for the target environment
-```
-
-— and not recommended from a `Checks` build, whose `"use cache"` results are
-the un-configured store's empty menus and collections.
+| Workflow | What it runs | Ships to a product |
+|---|---|---|
+| `checks.yml` | install, wire fixtures (and the committed config is their render), typecheck, lint, test, build — every PR (not pushes: on main, `ci.yml` must be the only run a commit has, because the bootstrap's convergence watch takes the newest one) | yes |
+| `ci.yml` | the Orun pipeline: `orun plan --changed`, then one job per lane; applies the R2 bucket, then deploys stage → prod on merge. It plans nothing while `intent.yaml` names the placeholder workspace `ws_CHANGE_ME`, as this repository does | yes |
+| `baseline.yml` | the baseline's own tiers: contract tests, the wiring path, the blueprint read by the pinned orun, the leak gate, the offline bootstrap with the product's own plan, the product built in the job tree, dry-deployed, served, browsed and added to the cart | no |
+| `tag.yml` | cuts a `baseline-vN` tag (manual) | no |

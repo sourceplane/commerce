@@ -1,0 +1,37 @@
+apiVersion: orun.io/v1
+kind: TaskContract
+metadata:
+  name: CM-5
+  title: "A baseline, in one landing"
+spec:
+  goal: The repository is an Orun baseline — a card and a build document that take a new storefront from nothing to live on stage and prod in ONE landing, the R2 bucket applied (with its own r2-data key) before the Worker that binds it, branded as its own, rendering a demo catalogue and taking a cart with no third-party key, with gates that prove it offline
+  affects:
+    - blueprint.yaml
+    - repo-blueprint.yaml
+    - BOOTSTRAP.md
+    - README.md
+    - .baseline/**
+    - tooling/rebrand/**
+    - tooling/bootstrap/**
+    - tooling/wire/**
+    - hooks/**
+    - testing/**
+    - docs/phases/**
+    - ai/context/**
+    - .github/workflows/**
+    - .gitignore
+    - intent.yaml
+    - packages/.gitkeep
+    - apps/web/**
+    - tests/web/**
+    - infra/terraform/cloudflare-r2/**
+    - specs/**
+    - tasks/**
+  doneWhen:
+    - orun (the bootstrap floor, the lane pin and the current CLI) reads repo-blueprint.yaml, and the card agrees with it — CLOUDFLARE_R2_TOKEN (r2-data) included
+    - the product's own push-to-main plan applies cloudflare-r2 before it deploys web, on stage and prod, and a pull request waits on nothing
+    - a fresh build renders home, a product page and the cart from the bundled demo catalogue, and checkout answers "connect a payment provider" rather than a 500
+    - the leak gate, the wiring contract, the offline bootstrap and the end-to-end tier (browse, add to cart, check out) are green in Baseline CI
+    - the as-built status records the departures and what is not yet proven live
+  gates:
+    - checks

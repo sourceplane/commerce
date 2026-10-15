@@ -1,5 +1,8 @@
 apiVersion: orun.io/v1
 kind: TaskContract
+metadata:
+  name: CM-4
+  title: "Ready to instantiate"
 spec:
   goal: A reader can run, test, preview and deploy the port from the README and connect it to a Shopify store; the as-built status is complete
   affects:

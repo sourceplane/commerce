@@ -9,7 +9,7 @@ This doc set, `epic.yaml` and the task contracts, merged to `main`.
 
 **Done when**
 - the five documents and `epic.yaml` are on `main`
-- `tasks/CM-1..CM-4.TaskContract.yaml` exist
+- `tasks/CM-1..CM-4.TaskContract.yaml` exist (CM-5 joined with CM4)
 
 ## CM1 — the storefront on Workers ✅
 
@@ -52,11 +52,49 @@ with PRs and departures, epic `completed`.
 - the README quick start works from a fresh clone with a `.dev.vars`
 - the status file lists every PR and departure
 
+## CM4 — a baseline, in one landing ✅
+
+`blueprint.yaml`, `repo-blueprint.yaml` (two phases: `01-product`,
+`02-docs`), `.baseline/` (identity, task contracts, the product's README),
+`tooling/rebrand`, `tooling/bootstrap`, `hooks/render-deployment-docs.sh`,
+`ai/context/`, `docs/phases/`, `BOOTSTRAP.md`, `testing/`, `baseline.yml`
+and `tag.yml` (design §9); what the product needed to deploy from a fresh
+repository — `wrangler.jsonc` committed, dev rendering the fixture,
+`apps/web`'s enforced `dependsOn: cloudflare-r2` on main, the R2 root's own
+`r2-data` key, `packages/` — and to go live with no third-party key: the demo
+catalogue, the cookie cart, `/cart`, `/checkout`'s notice, no `SITE_URL`.
+
+**Done when**
+- orun at the bootstrap floor (v2.58.11), the lane pin (v2.78.4) and the
+  current CLI (v2.79.0) reads `repo-blueprint.yaml`, and
+  `testing/manifest.test.sh` holds the card to it
+- the product's own push-to-main plan applies `cloudflare-r2` (with
+  `CLOUDFLARE_R2_TOKEN`) before it deploys `web` on stage and prod
+  (`testing/placement.test.sh`)
+- a fresh build, served, renders home, a product and the cart; a product is
+  added to the cart and checkout answers "connect a payment provider"
+  (`testing/e2e.test.sh`)
+- `Baseline CI` is green
+- the status file records what is proven offline and what only a live
+  bootstrap can prove
+
+## After CM4 (outside this repository)
+
+1. Cut `baseline-v1` with `tag.yml` from the merged `main`.
+2. Register the row in orun-cloud's `infra/baselines-registry/baselines.yaml`
+   (unlisted) with the card vendored at the tag.
+3. Bootstrap one product from the tag against a workspace (risk CM-M is the
+   first thing it answers); record its timings; connect a Shopify development
+   store to it once; then flip the row to public with a page on orunbase.com.
+
 ## Sequencing note
 
 CM1 and CM2 are independent files but CM1's component and wrangler template
 already name the root's wiring document, so CM2 is the half that makes
 those names true. Applying CM2 and deploying need a workspace with a
-Cloudflare connection; until then the Orun lane is gated and `Checks` is
-the merge gate. The Worker secrets (the Shopify facts) are set by hand once
-per environment — the product's one manual step — and CM3 documents it.
+Cloudflare connection; until then the Orun lane plans nothing
+(`ws_CHANGE_ME`) and `Checks` is the merge gate. The Worker secrets (the
+Shopify facts) are set by hand once per environment — the product's one
+manual step, which CM3 documents and CM4 makes optional: a storefront without
+them serves its demo catalogue. CM4 packages CM1–CM2 as a baseline whose one
+landing applies CM2's root before it deploys CM1's Worker.

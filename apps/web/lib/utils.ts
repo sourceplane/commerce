@@ -1,12 +1,8 @@
 import { ReadonlyURLSearchParams } from "next/navigation";
 
-// On Cloudflare the public origin is the SITE_URL wrangler var; Vercel's
-// VERCEL_PROJECT_PRODUCTION_URL is kept for parity with upstream.
-export const baseUrl = process.env.SITE_URL
-  ? process.env.SITE_URL
-  : process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : "http://localhost:3000";
+// There is no configured origin (upstream's `baseUrl`, built on Vercel's
+// VERCEL_PROJECT_PRODUCTION_URL): every absolute URL the site renders about
+// itself is built on the request's own origin — `requestOrigin` in app/site.ts.
 
 export const createUrl = (
   pathname: string,

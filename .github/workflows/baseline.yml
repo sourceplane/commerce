@@ -1,0 +1,136 @@
+name: Baseline CI
+
+# THE FACTORY'S OWN LANES — this repository tested as a BASELINE: that its
+# build document parses with the orun a bootstrap actually runs, that its card
+# agrees with it, that every component is placed by the one product phase,
+# that the R2 bucket's wiring reaches the Worker's config, that a placed
+# tree comes up branded and carrying nothing of the factory — and plans the
+# bucket before the Worker on a merge — and that the product it produces
+# installs, builds, deploys (dry), serves, and takes a cart.
+#
+# ─── WHY THIS IS NOT IN ci.yml OR checks.yml ──────────────────────────────
+#
+# `repo-blueprint.yaml`'s `github-workflows` module copies the WHOLE `.github`
+# directory into every site built from this repository. These jobs run
+# `testing/*.sh`, and `testing/` is deliberately not placed — so in a site they
+# would be steps that cannot pass, red on its very first pull request. This
+# file is in the blueprint's `ignore` list, and `testing/coverage.test.sh`
+# fails on any workflow that reads `testing/` and is not.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: baseline-ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # Tier 0. bash, python3 and git; node for the tools. No workspace install,
+  # no network, no credential — the job that most certainly fails a PR.
+  baseline-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          # setup-node v5 turns on the pnpm cache by itself when package.json
+          # names a packageManager, and then fails on a runner with no pnpm.
+          # This job installs nothing.
+          package-manager-cache: false
+      - name: Contract tests (manifest, phases, coverage, rebrand, retouch, bootstrap-defer, wire)
+        run: |
+          set -euo pipefail
+          python3 -c 'import yaml' 2>/dev/null || pip install --quiet pyyaml
+          for t in manifest phases coverage rebrand retouch bootstrap-defer wire; do
+            echo "── $t"
+            bash "testing/$t.test.sh"
+          done
+
+  # Tier 1. THE BLUEPRINT, READ AND PLACED BY THE BINARY A BOOTSTRAP RUNS.
+  #
+  # Pinned at the bootstrap floor (BOOTSTRAP.md), not the site's lane pin:
+  # every test here reads YAML with PyYAML, which parses anything well-formed;
+  # only the pinned orun can say whether the document is one a bootstrap can
+  # run. `--status` parses it, validates every hook against the action
+  # registry, compiles every `when` and narration template, and writes
+  # nothing. Then the leak gate (what a product would carry, derived by the
+  # floor too), and the placement tier (the offline bootstrap: both phases
+  # placed and finished by the blueprint's own hooks, then the product's own
+  # `orun plan` for the 01-product merge — the R2 apply before the Worker's
+  # deploy — under the product's lane pin, below).
+  blueprint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: sourceplane/orun-action@v1.2.0
+        with:
+          version: v2.58.11
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: repo-blueprint.yaml, read by the pinned CLI
+        run: |
+          set -euo pipefail
+          orun --version
+          python3 -c 'import yaml' 2>/dev/null || pip install --quiet pyyaml
+          # Required inputs must be supplied for the document to resolve; the
+          # values are arbitrary and nothing is written.
+          orun new --blueprint repo-blueprint.yaml --status \
+            --out "$(mktemp -d)" \
+            --set reponame=acme-shop \
+            --set "productname=Acme Shop" \
+            --set productdomain=shop.acme.dev \
+            --set githuborg=acme-inc
+      - name: the leak gate — what a product carries
+        run: bash testing/leak.test.sh
+      # The placement tier ENDS with the product's own `orun plan` — what the
+      # product's ci.yml runs — so it runs under the product's lane pin, not
+      # the bootstrap floor. v2.58.11 plans a pull request with apps/web
+      # waiting on the R2 plan: it does not apply a dependsOn edge's
+      # `modeRules`. The lane pin does (advisory on a PR, enforced on main),
+      # and the test refuses an orun older than the pin rather than assert
+      # the wrong CLI's plan. Its placements are valid under either.
+      - uses: sourceplane/orun-action@v1.2.0
+        with:
+          version: v2.78.4
+      - name: placement — the offline bootstrap, and the product's own plan
+        run: |
+          git config --global user.email ci@example.invalid
+          git config --global user.name "baseline ci"
+          bash testing/placement.test.sh
+
+  # Tier 2. THE PRODUCT IT PRODUCES WORKS: its one landing under the checks
+  # its pull request waits on, the stage lane's own structure check, build
+  # (the live wiring render included), output check and dry deploy in the tree
+  # orun stages, and the built Worker served and smoke-tested with the
+  # component's own smoke command. Pinned at the product's lane version,
+  # because that is the orun the product's CI runs.
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: sourceplane/orun-action@v1.2.0
+        with:
+          version: v2.78.4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: e2e — the bootstrapped product builds, deploys (dry) and serves
+        run: |
+          python3 -c 'import yaml' 2>/dev/null || pip install --quiet pyyaml
+          git config --global user.email ci@example.invalid
+          git config --global user.name "baseline ci"
+          bash testing/e2e.test.sh

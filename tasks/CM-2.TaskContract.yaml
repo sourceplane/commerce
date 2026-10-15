@@ -1,5 +1,8 @@
 apiVersion: orun.io/v1
 kind: TaskContract
+metadata:
+  name: CM-2
+  title: "The storefront on Workers"
 spec:
   goal: The upstream Next.js Commerce storefront runs on Cloudflare Workers + Static Assets with R2 and Durable Objects as its Next.js cache, a per-environment rendered wrangler config and green checks
   affects:

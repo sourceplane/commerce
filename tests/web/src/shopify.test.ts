@@ -204,14 +204,35 @@ describe("getProduct and getProducts", () => {
 });
 
 describe("without a configured store", () => {
-  it("the guarded readers answer empty instead of calling Shopify", async () => {
+  it("every reader answers from the bundled demo catalogue, never calling Shopify", async () => {
     delete process.env.SHOPIFY_STORE_DOMAIN;
-    const { getCollectionProducts, getCollections, getMenu, getProduct } =
-      await import("lib/shopify");
-    expect(await getMenu("next-js-frontend-header-menu")).toEqual([]);
-    expect(await getCollectionProducts({ collection: "hidden-homepage-featured-items" })).toEqual([]);
-    expect(await getProduct("tee")).toBeUndefined();
-    expect((await getCollections()).map((c) => c.handle)).toEqual([""]);
+    const lib = await import("lib/shopify");
+    expect(lib.isShopifyConfigured()).toBe(false);
+    expect((await lib.getMenu("next-js-frontend-header-menu")).map((m) => m.path)).toEqual([
+      "/search",
+      "/search/apparel",
+      "/search/accessories",
+    ]);
+    expect(
+      await lib.getCollectionProducts({ collection: "hidden-homepage-featured-items" }),
+    ).toHaveLength(3);
+    expect((await lib.getProduct("cloud-tee"))?.title).toBe("Cloud Tee");
+    expect(await lib.getProduct("no-such-product")).toBeUndefined();
+    expect((await lib.getCollections()).map((c) => c.handle)).toEqual([
+      "",
+      "apparel",
+      "accessories",
+    ]);
+    expect((await lib.getPage("about"))?.title).toBe("About this store");
+    expect(await lib.getPage("no-such-page")).toBeUndefined();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("with a store, the same readers go to Shopify", async () => {
+    reply({ data: { product: product("tee") } });
+    const lib = await import("lib/shopify");
+    expect(lib.isShopifyConfigured()).toBe(true);
+    expect((await lib.getProduct("tee"))?.handle).toBe("tee");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
