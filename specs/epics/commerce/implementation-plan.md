@@ -3,7 +3,7 @@
 Milestones land in order; each task is one pull request on an
 `orun/CM-n-<slug>` branch with an `Orun-Task: CM-n` trailer.
 
-## CM0 — the spec
+## CM0 — the spec ✅
 
 This doc set, `epic.yaml` and the task contracts, merged to `main`.
 
@@ -11,7 +11,7 @@ This doc set, `epic.yaml` and the task contracts, merged to `main`.
 - the five documents and `epic.yaml` are on `main`
 - `tasks/CM-1..CM-4.TaskContract.yaml` exist
 
-## CM1 — the storefront on Workers
+## CM1 — the storefront on Workers ✅
 
 `apps/web` is the upstream template with the Workers build around it:
 `open-next.config.ts` names the R2 incremental cache, the Durable Object
@@ -27,7 +27,7 @@ and the revalidation webhook without a network.
 - `POST /api/revalidate` answers `{"status":401}` without the secret and `{"status":200,"revalidated":true}` for a product or collection webhook with it, writing the tag to the Durable Object tag cache
 - `"use cache"` results land in the (local) R2 bucket at request time
 
-## CM2 — the cache infrastructure from Terraform
+## CM2 — the cache infrastructure from Terraform ✅
 
 `infra/terraform/cloudflare-r2` provisions one bucket per environment and
 publishes its name as the `WIRING_CLOUDFLARE_R2` secret; `apps/web/component.yaml`
@@ -40,7 +40,7 @@ the migration in the wrangler config creates them on the first deploy.
 - the component's `secretEnv` keys match the root's `secretOutputs`
 - the fixture's wiring keys match the template's tokens (`wire:fixture` renders)
 
-## CM3 — ready to instantiate
+## CM3 — ready to instantiate ✅
 
 README (run, test, preview, deploy; the Shopify connection: Storefront
 token, store domain, webhook secret as Worker secrets, the menus and

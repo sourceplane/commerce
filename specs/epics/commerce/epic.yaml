@@ -9,7 +9,7 @@ metadata:
 spec:
   title: "Vercel's Next.js Commerce on Cloudflare Workers"
   summary: "Vercel's Next.js Commerce — the Shopify headless storefront: server components over the Storefront API, server-action cart, `\"use cache\"` data with tag revalidation from Shopify webhooks — runs on Cloudflare Workers + Static Assets through @opennextjs/cloudflare, with the Next.js data cache in an R2 bucket provisioned by Terraform through Orun and the tag cache and revalidation queue in Durable Objects the Worker itself exports. The Shopify Storefront API stays the backend, reached with Worker secrets; nothing in the storefront's code changes beyond what Workers and Next 16 force."
-  state: draft
+  state: completed
   milestones:
     - name: "CM0 — the spec"
       exitCriteria:
