@@ -8,7 +8,7 @@ The upstream code stays the code: `lib/shopify` (queries, mutations, reshaping, 
 
 | Field | Value |
 |-------|-------|
-| Status | Draft — CM0 in review |
+| Status | ✅ Shipped — CM0–CM3 landed (#1–#4); R2 apply and live deploy gated on a linked workspace |
 | Cluster | **CM** (CM0–CM3) |
 | Owner(s) | `apps/web` (the storefront) · `tests/web` (client + webhook tests) · `infra/terraform/cloudflare-r2` (the cache bucket) |
 | Builds on | `cirrus-baseline` conventions — intent, components, the Checks lane, the gated Orun lane; the factory's `cloudflare-r2` root and `tooling/wire` renderer |
@@ -16,7 +16,7 @@ The upstream code stays the code: `lib/shopify` (queries, mutations, reshaping, 
 | Changes | Adds the Workers build, the cache bindings, the monorepo wrapper, tests, the R2 root and the deploy contract; the storefront's code is untouched except where Next 16 or Workers force a change (status file) |
 | Decisions locked | (1) OpenNext on Workers + Static Assets. (2) Incremental cache in R2, tag cache and queue in Durable Objects — no D1, no KV. (3) `wrangler.jsonc` is rendered per environment from the R2 root's wiring document; never committed. (4) The Shopify facts are Worker secrets set once per environment; the deploy lane does not set them. (5) `experimental.useCache`, not `cacheComponents`, until the adapter runs staged renders. |
 | Gate | CM1 is the first user-visible rung. CM2 needs a workspace with a Cloudflare connection to apply; it is verified by `terraform validate` and `plan`. |
-| Shipped as | — |
+| Shipped as | `main` after [#4](https://github.com/sourceplane/commerce/pull/4); verified locally under `wrangler dev` with the fixture config, an empty local bucket, local Durable Objects and dummy secrets |
 
 ## Read order
 
