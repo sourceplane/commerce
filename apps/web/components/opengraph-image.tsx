@@ -1,4 +1,5 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { SITE_NAME } from "app/site";
 import { ImageResponse } from "next/og";
 import LogoIcon from "./icons/logo";
 import { join } from "path";
@@ -29,12 +30,9 @@ async function loadFont(): Promise<ArrayBuffer> {
 export default async function OpengraphImage(
   props?: Props,
 ): Promise<ImageResponse> {
-  const { title } = {
-    ...{
-      title: process.env.SITE_NAME,
-    },
-    ...props,
-  };
+  // The site's name when the route has no title of its own (a page or a
+  // collection that does not exist yet).
+  const title = props?.title || SITE_NAME;
 
   const font = await loadFont();
 

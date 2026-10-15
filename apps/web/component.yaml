@@ -2,7 +2,7 @@ apiVersion: sourceplane.io/v1
 kind: Component
 metadata:
   name: web
-  description: The Next.js Commerce storefront (Next.js on Cloudflare Workers + Static Assets via @opennextjs/cloudflare, per environment; R2 + Durable Objects as the Next.js cache)
+  description: The storefront (Next.js on Cloudflare Workers + Static Assets via @opennextjs/cloudflare, per environment; R2 + Durable Objects as the Next.js cache; a bundled demo catalogue until a Shopify store is connected)
 spec:
   type: cloudflare-workers-assets-turbo
   lifecycle: production
@@ -12,12 +12,22 @@ spec:
   # Its own lane per environment: the Next.js build is the longest job in the
   # plan, and a shared lane would wait on it.
   lane: isolated
-  # The R2 bucket is the Worker's incremental cache: its name is rendered into
-  # wrangler.jsonc from the root's wiring document before the build. The
-  # Durable Objects (tag cache, revalidation queue) need no root — the Worker
-  # exports their classes and the migration creates them on deploy.
+  # INFRA BEFORE APP. The R2 bucket is the Worker's incremental cache, bound
+  # by name, and the name is rendered into its config during the build from
+  # the wiring document the cloudflare-r2 root lease-publishes after its
+  # apply. A job resolves its secrets when it STARTS, so on a merge to main
+  # this deploy waits for that environment's apply (enforced) and the document
+  # is there; a pull request deploys nothing, so nothing on one waits
+  # (advisory). The Durable Objects (tag cache, revalidation queue) need no
+  # root — the Worker exports their classes and the migration creates them on
+  # deploy.
   dependsOn:
     - component: cloudflare-r2
+      mode: enforced
+      modeRules:
+        - mode: advisory
+          when:
+            triggerRef: github-pull-request
   secretEnv:
     WIRING_CLOUDFLARE_R2_STAGE: "secret://commerce/commerce/stage/WIRING_CLOUDFLARE_R2"
     WIRING_CLOUDFLARE_R2_PROD: "secret://commerce/commerce/prod/WIRING_CLOUDFLARE_R2"
@@ -62,13 +72,21 @@ spec:
     workersDevSubdomain: your-workers-subdomain
 
     installCommand: pnpm install --frozen-lockfile
-    # Render this environment's wrangler config from the wiring document, then
-    # build (the verify lane already rendered from the fixture through
-    # `wire:fixture`; a deploy lane re-renders with the real values).
-    buildCommand: node ../../tooling/wire/live.mjs --template wrangler.template.jsonc --out wrangler.jsonc --components cloudflare-r2 --env "${ORUN_ENVIRONMENT}" && pnpm exec turbo run build --filter=@app/web
+    # Render this environment's wrangler config, then build. stage and prod
+    # render from the wiring document their cloudflare-r2 apply published
+    # (secretEnv above, resolved before the job's first step); dev, which no
+    # root applies to and which only verifies, renders from the committed
+    # fixture. The committed wrangler.jsonc (the fixture render) is what the
+    # composition's verify-app-structure step finds before this runs.
+    buildCommand: node ../../tooling/wire/live.mjs --template wrangler.template.jsonc --out wrangler.jsonc --components cloudflare-r2 --env "${ORUN_ENVIRONMENT}" --fixture wiring.fixture.json --fixture-envs dev && pnpm exec turbo run build --filter=@app/web
 
-    # Smoke: the home page renders and carries the site name.
-    smokeCommand: 'html=$(curl -sfL "${DEPLOYED_URL}/") && echo "${html}" | grep -q ''Next.js Commerce'''
+    # Smoke: the storefront answers, and the Worker renders per request —
+    # robots.txt names the origin it was ASKED on (app/site.ts), which no
+    # static file can. Not the site's name: that is the owner's to change, and
+    # HTML-escaped when it carries an `&` or `'`. Not a product either: the
+    # catalogue is the demo until the owner connects a store, and theirs may
+    # be empty. Buffered before grep so an early match cannot SIGPIPE curl.
+    smokeCommand: 'curl -sfL -o /dev/null "${DEPLOYED_URL}/" && robots=$(curl -sfL "${DEPLOYED_URL}/robots.txt") && echo "${robots}" | grep -qiF "Host: ${DEPLOYED_URL}"'
   labels:
     team: platform
     layer: delivery

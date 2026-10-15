@@ -1,14 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// lib/utils.ts: the URL helpers the search page and the cart modal use, the
-// env check the sitemap runs, and the origin every absolute URL is built on.
+// lib/utils.ts: the URL helpers the search page and the cart modal use, and
+// the Shopify env check. (The origin every absolute URL is built on is the
+// request's own: app/site.ts, tests in site.test.ts.)
 
 const env = { ...process.env };
 const SHOPIFY_VARS = [
   "SHOPIFY_STORE_DOMAIN",
   "SHOPIFY_STOREFRONT_ACCESS_TOKEN",
-  "SITE_URL",
-  "VERCEL_PROJECT_PRODUCTION_URL",
 ] as const;
 
 beforeEach(() => {
@@ -65,21 +64,5 @@ describe("validateEnvironmentVariables", () => {
     process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN = "token";
     const { validateEnvironmentVariables } = await import("lib/utils");
     expect(() => validateEnvironmentVariables()).not.toThrow();
-  });
-});
-
-describe("baseUrl", () => {
-  it("is the SITE_URL wrangler var on Cloudflare", async () => {
-    process.env.SITE_URL = "https://commerce-web-stage.example.workers.dev";
-    const { baseUrl } = await import("lib/utils");
-    expect(baseUrl).toBe("https://commerce-web-stage.example.workers.dev");
-  });
-
-  it("keeps upstream's Vercel fallback and the local default", async () => {
-    process.env.VERCEL_PROJECT_PRODUCTION_URL = "shop.vercel.app";
-    expect((await import("lib/utils")).baseUrl).toBe("https://shop.vercel.app");
-    delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
-    vi.resetModules();
-    expect((await import("lib/utils")).baseUrl).toBe("http://localhost:3000");
   });
 });

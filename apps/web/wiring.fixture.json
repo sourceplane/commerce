@@ -1,4 +1,7 @@
 {
+  "cloudflare-r2/dev": {
+    "r2_bucket_name": "dev-commerce-dev"
+  },
   "cloudflare-r2/stage": {
     "r2_bucket_name": "stg-commerce-stage"
   },

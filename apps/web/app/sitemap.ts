@@ -1,6 +1,7 @@
 import { getCollections, getPages, getProducts } from "lib/shopify";
-import { baseUrl, validateEnvironmentVariables } from "lib/utils";
 import { MetadataRoute } from "next";
+import { headers } from "next/headers";
+import { requestOrigin } from "./site";
 
 type Route = {
   url: string;
@@ -9,8 +10,11 @@ type Route = {
 
 export const dynamic = "force-dynamic";
 
+// Built on the origin the request was made to (app/site.ts), and on whichever
+// catalogue answers — a connected Shopify store or the bundled demo — so it
+// is complete on a fresh deploy too.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  validateEnvironmentVariables();
+  const baseUrl = requestOrigin(await headers())?.origin ?? "";
 
   const routesMap = [""].map((route) => ({
     url: `${baseUrl}${route}`,

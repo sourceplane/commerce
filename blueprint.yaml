@@ -1,0 +1,151 @@
+# The commerce card: what the console's Blueprints page renders and the
+# platform's bootstrap door consumes.
+#
+# THIS FILE IS NOT THE BUILD. `spec.bootstrap.blueprint` names the build
+# document — `repo-blueprint.yaml`, whose phases a runner places. This card is
+# what an operator reads and fills in before pressing Build, and
+# `testing/manifest.test.sh` compares every list below to the document that
+# actually does the thing, not to a copy of itself.
+#
+# The division of labour with the registry is strict: the registry (orun-cloud
+# `infra/baselines-registry/baselines.yaml`) owns identity and commerce — id,
+# visibility, tier, the pinned tag. This file owns the build contract. Neither
+# restates the other, which is why there is no `tag` here: this file is
+# fetched AT the tag the registry pins.
+apiVersion: orun.io/v1
+kind: Blueprint
+metadata:
+  name: commerce
+  displayName: Storefront — Next.js Commerce on Cloudflare Workers
+  description: >
+    Vercel's Next.js Commerce as a product of its own: a headless storefront —
+    home, search, collections, product pages, a server-action cart — built by
+    OpenNext into one Cloudflare Worker with Static Assets, the Next.js data
+    cache in an R2 bucket Terraform provisions per environment and its tag
+    cache and revalidation queue in Durable Objects, and CI that applies the
+    bucket and deploys the storefront to stage and prod on merge. It serves a
+    bundled demo catalogue and a cookie cart until the owner connects a
+    Shopify store; checkout asks for a payment provider until then. One
+    provider, one consent. Live in about sixteen minutes, in one landing.
+  tags: [storefront, shopify, r2, cloudflare, nextjs, terraform]
+spec:
+  source:
+    repo: sourceplane/commerce
+    # No `tag`. The registry pins it; this file is fetched at it.
+
+  # ── What the operator reads first ────────────────────────────────────────
+  overview:
+    lede: >
+      A headless storefront on Cloudflare: Vercel's Next.js Commerce on one
+      Worker, its data cache in R2. It renders a demo catalogue and takes a
+      cart from the first deploy; connect Shopify to sell your own products.
+    architecture:
+      - layer: Edge
+        items: [web]
+      - layer: Data
+        items: [R2 (cloudflare-r2), Durable Objects (tag cache, queue)]
+      - layer: Delivery
+        items: [GitHub Actions, OpenNext, Terraform]
+    outcome:
+      - Live on stage and prod, in one landing
+      - The R2 bucket applied before the Worker that binds it
+      - A demo catalogue and a working cart with no third-party key
+      - Every merge redeploys, smoke-tested
+      - Its own CI from the first commit
+
+  requires:
+    # Cloudflare is the only provider connection a bootstrap needs. GitHub
+    # arrives as the App installation plus the repo link, not as a
+    # connection row. Shopify is not a provider the platform brokers: the
+    # storefront runs on its demo catalogue until the owner adds a store's
+    # Worker secrets after the build (the product's README says how), so the
+    # card asks for no Shopify key.
+    integrations: [github, cloudflare]
+    apiKeyRole: admin          # secret writes need the admin floor
+
+  # Every input is collected by the console: keys are lowercase (the
+  # platform's reader refuses anything else), every one carries the `pattern`
+  # its value is checked against before Continue, and a value the console
+  # already holds says so with `from`. repo-blueprint.yaml declares the same
+  # names; `repoPrivate`, `orunWorkspace` and `epicSlug` are build inputs with
+  # defaults (or filled from the build's workspace) and are not asked.
+  inputs:
+    - key: reponame
+      label: Repo name
+      pattern: "^[a-z][a-z0-9-]{1,38}$"
+      # The operator picked the repository; its name IS this value.
+      from: repo.name
+    - key: productname
+      label: Store name
+      pattern: "^[A-Za-z0-9][A-Za-z0-9 .,'&-]{1,48}$"
+      help: The name shoppers see — the navbar, the footer, every page title.
+      example: Acme Shop
+    - key: productdomain
+      label: Store domain
+      pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+      help: The domain the store will answer on. It does not need to exist — the store goes live on workers.dev first.
+      example: shop.acme.dev
+    - key: githuborg
+      label: GitHub organisation
+      pattern: "^[A-Za-z0-9][A-Za-z0-9-]*$"
+      help: The GitHub org or user the store's repository is created under.
+      # DERIVED FROM THE CHOSEN REPOSITORY: its owner IS this value. Declared
+      # because repo-blueprint.yaml requires it — a build may declare more
+      # inputs than this card, but not require one nobody supplies.
+      from: repo.owner
+    - key: subdomain
+      label: workers.dev subdomain
+      pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
+      help: The workers.dev subdomain of the Cloudflare account the store deploys into.
+      example: acme
+
+  # ── PREVIEW ONLY. repo-blueprint.yaml's `orun.integrations/reconcile@v1`
+  # hooks mint these, brokered, during 01-product. ─────────────────────────
+  # Transcribed from those hooks' own `keys:` and `template:` values, so
+  # testing/manifest.test.sh compares this list to the document that mints
+  # them. The console renders them read-only: no credential is ever typed,
+  # shown or stored. Keys that already exist are kept. The bucket names are
+  # not here: they are not credentials, and the bucket's own apply publishes
+  # them. Nor are Shopify's: the platform does not broker them, and the
+  # storefront needs none to go live.
+  secrets:
+    - key: CLOUDFLARE_API_TOKEN
+      provider: cloudflare
+      template: workers-deploy
+      why: Deploys the storefront's Worker and its static assets
+    - key: CLOUDFLARE_R2_TOKEN
+      provider: cloudflare
+      template: r2-data
+      why: Applies the R2 cache bucket — the deploy token deliberately carries no R2
+    - key: CLOUDFLARE_ACCOUNT_ID
+      provider: cloudflare
+      template: account-id
+      why: Connection fact, not a secret
+      fact: true
+
+  # ── PREVIEW ONLY. repo-blueprint.yaml's run-level `hooks.preInstantiate`
+  # opens these — the epic, every milestone in this order, every task — before
+  # the first phase places. Idempotent by identity, so a re-run finds what it
+  # made before.
+  programme:
+    epicSlug: commerce-baselining      # = repo-blueprint.yaml's `epicSlug` default
+    epicName: "Storefront baselining — {productname}"
+    milestones:
+      # The whole product is one landing (01-product): the repository, the R2
+      # root, the storefront and its tests are one pull request and one
+      # convergence.
+      - name: 01-product
+      - name: 02-docs
+
+  bootstrap:
+    # THE BUILD DOCUMENT. There is no umbrella workflow and no agent brief:
+    # every phase is declared in it and orun runs it.
+    blueprint: repo-blueprint.yaml
+    # Summed from the phases' expectedMinutes. An estimate until a bootstrap
+    # measures it.
+    expectedMinutes: 16
+    tokenChannel: ORUN_TOKEN_FILE   # how a runner hands over its refreshed token
+  verify:
+    urls:
+      - "https://{reponame}-web-{env}.{subdomain}.workers.dev"
+    envs: [stage, prod]

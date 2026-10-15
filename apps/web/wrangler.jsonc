@@ -1,0 +1,52 @@
+// GENERATED from wrangler.template.jsonc by tooling/wire — edit the
+// template, not this file. The committed copy is the fixture render
+// (`pnpm run wire:fixture`); every Orun lane renders its own environment.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "commerce-web-stage",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "observability": { "enabled": true },
+  // No `vars`: the site's name is app/site.ts, and its origin is the request's
+  // own. A Shopify store is connected with Worker secrets (SHOPIFY_*, the
+  // README's "Connecting Shopify"); until then the storefront serves its
+  // bundled demo catalogue. COMPANY_NAME (the footer's copyright line) is an
+  // optional var an owner may add here.
+
+  // The Next.js incremental cache — pre-rendered pages and `"use cache"`
+  // entries — in the bucket infra/terraform/cloudflare-r2 provisions.
+  "r2_buckets": [
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "stg-commerce-stage",
+    },
+  ],
+  // The tag cache (which tags `revalidateTag` invalidated, and when) and the
+  // revalidation queue: Durable Objects the generated Worker exports, created
+  // by the migration on first deploy.
+  "durable_objects": {
+    "bindings": [
+      { "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" },
+      {
+        "name": "NEXT_TAG_CACHE_DO_SHARDED",
+        "class_name": "DOShardedTagCache",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["DOQueueHandler", "DOShardedTagCache"],
+    },
+  ],
+  // The queue revalidates a stale route by requesting it from the Worker
+  // itself.
+  "services": [
+    { "binding": "WORKER_SELF_REFERENCE", "service": "commerce-web-stage" },
+  ],
+}

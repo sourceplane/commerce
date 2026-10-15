@@ -1,14 +1,21 @@
 name: Checks
 
 # Credential-free verification: install, render the offline wrangler fixtures,
-# typecheck, lint, test and build. Runs on every push and pull request and is
-# the merge gate until the product is linked to an Orun workspace, at which
-# point `ci.yml` (Orun plan/run with brokered Cloudflare credentials) takes
-# over — it stays gated behind the `ORUN_CI` repository variable until then.
+# typecheck, lint, test and build, on every pull request, linked or not.
+# `ci.yml` is the Orun pipeline beside it (plan/run with brokered Cloudflare
+# credentials, deploys on merge); it plans nothing until intent.yaml names a
+# workspace.
+#
+# PULL REQUESTS ONLY — not pushes to main. A push to main must start exactly
+# one workflow, `ci.yml`, because the bootstrap's convergence watch
+# (`orun.run/watch@v1` with `sha:`) takes the newest run for the merge commit
+# from ANY workflow. With this one on push too, the first live bootstrap
+# watched this run go green while ci.yml's deploy lanes had failed, and called
+# the site converged. On main the convergence builds and tests the site
+# anyway. The baseline's coverage gate holds the rule.
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: checks-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
@@ -33,6 +40,11 @@ jobs:
       # Templated deployables render their wrangler config from the committed
       # fixture; an unresolved wiring token fails here, not at deploy time.
       - run: pnpm run wire:fixture
+      # …and the render is what is committed. The deploy lane checks that the
+      # config exists before it builds, so wrangler.jsonc is in the tree as the
+      # fixture render; a template edited without re-rendering fails here.
+      - name: the committed wrangler config is the fixture render
+        run: git diff --exit-code
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test

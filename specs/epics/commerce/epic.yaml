@@ -32,3 +32,11 @@ spec:
         - "the README says how to run, test, preview and deploy it through Orun, how Shopify is connected (secrets, menus, collections, the revalidation webhook) and what the first deploy serves"
         - "the as-built status records every departure from the upstream template"
       tasks: [CM-4]
+    - name: "CM4 — a baseline, in one landing"
+      exitCriteria:
+        - "blueprint.yaml (the console card) and repo-blueprint.yaml (the build) take a new storefront from nothing to live on stage and prod in ONE landing (01-product) and a hook-only record (02-docs)"
+        - "the product's own push-to-main plan applies cloudflare-r2 — with an r2-data key, CLOUDFLARE_R2_TOKEN — before it deploys web, and the landing's await finds WIRING_CLOUDFLARE_R2 on stage and prod"
+        - "a fresh build needs no third-party key: the storefront renders a bundled demo catalogue and takes a cookie cart, and checkout asks for a payment provider instead of failing"
+        - "a product built from it carries the product only, renamed throughout to its own name, repository, Worker and bucket names"
+        - "Baseline CI is green: contract tests, the blueprint read by the pinned orun, the leak gate, the offline bootstrap and the end-to-end tier"
+      tasks: [CM-5]

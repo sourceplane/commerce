@@ -18,7 +18,9 @@ terraform {
 }
 
 # Authenticates via the CLOUDFLARE_API_TOKEN env var (provider-native): the
-# token is an orun-managed secret resolved into the job env at run time.
+# token is an orun-managed secret resolved into the job env at run time —
+# minted from the r2-data template (R2 write), not the Workers deploy token,
+# which carries no R2 (component.yaml).
 provider "cloudflare" {}
 
 variable "cloudflare_account_id" {
@@ -85,10 +87,11 @@ variable "terraformVersion" {
 
 # --- The app's object store ---
 #
-# One R2 bucket per environment. It stands in for Vercel Blob: uploads the app
-# accepts (attachments, images) and, where the app's OpenNext config asks for
-# it, the Next.js incremental cache. Bucket names are unique per account, so
-# the name carries the product and the environment.
+# One R2 bucket per environment: the storefront's Next.js incremental cache
+# (OpenNext's r2-incremental-cache, bound as NEXT_INC_CACHE_R2_BUCKET) — every
+# `"use cache"` entry and pre-rendered page, written by the Worker at request
+# time. Bucket names are unique per account, so the name carries the product
+# (var.repo) and the environment.
 
 locals {
   bucket_name = "${var.namespacePrefix}${var.repo}-${var.environment}"
