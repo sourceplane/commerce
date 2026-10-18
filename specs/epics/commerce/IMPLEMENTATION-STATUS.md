@@ -9,7 +9,8 @@ the code departed from `design.md` or from the upstream template.
 | CM1 — the storefront on Workers | ✅ Shipped | [#2](https://github.com/sourceplane/commerce/pull/2) |
 | CM2 — the cache infrastructure from Terraform | ✅ Shipped (validated; apply gated on a linked workspace) | [#3](https://github.com/sourceplane/commerce/pull/3) |
 | CM3 — ready to instantiate | ✅ Shipped | [#4](https://github.com/sourceplane/commerce/pull/4) |
-| CM4 — a baseline, in one landing | ✅ Shipped (offline-proven; no live bootstrap yet, risk CM-P) | this PR (CM-5), to be tagged `baseline-v1` |
+| CM4 — a baseline, in one landing | ✅ Shipped (offline-proven; no live bootstrap yet, risk CM-P) | [#5](https://github.com/sourceplane/commerce/pull/5) (CM-5), tagged `baseline-v1` |
+| CM5 — the cirrus standard | ✅ Shipped | CM-6 — on `main` after `baseline-v1`, not yet tagged |
 
 ## Departures from the upstream template
 
@@ -48,7 +49,9 @@ upstream verbatim.
 `metadataBase`, robots and the sitemap are built on `baseUrl`, which
 upstream derives from Vercel's `VERCEL_PROJECT_PRODUCTION_URL`. On
 Cloudflare that is the `SITE_URL` wrangler var; the Vercel variable and the
-`http://localhost:3000` default are kept behind it.
+`http://localhost:3000` default are kept behind it. (Through CM3. CM4
+removed `SITE_URL` and `baseUrl`: every absolute URL is built on the
+request's own origin — "Identity, origin and the baseline's wiring" below.)
 
 ### `components/opengraph-image.tsx`: the font through `ASSETS`
 
@@ -76,8 +79,11 @@ exports (`/config`, `/overrides/*`), which `open-next.config.ts` imports.
   `components/cart/actions.ts` and `lib/shopify/index.ts`). Both are kept
   byte-identical; the `prettier` / `prettier:check` scripts remain but the
   workspace `test` is `tests/web`.
-- `.env.example` gains `SITE_URL` and a note on where each value lives;
-  `.dev.vars.example` lists the three Worker secrets.
+- `apps/web/.env.example` lists the optional values — `COMPANY_NAME` and the
+  three Shopify secrets — and where each lives (`.env.local` for `next dev`,
+  `.dev.vars` for the preview, Worker secrets when deployed). Through CM3 it
+  also carried `SITE_URL`, and a separate `.dev.vars.example` listed the
+  secrets; CM4 removed the one and folded in the other (below).
 - `tooling/migrations` (a `packages/db` checksum checker the skeleton
   carries for Supabase ports) is not in this repository: no database.
 
@@ -131,6 +137,42 @@ exports (`/config`, `/overrides/*`), which `open-next.config.ts` imports.
 | `apps/web/.dev.vars.example` | the three Shopify secrets | folded into `.env.example` | the blueprint's `ignore` drops `**/.dev.vars.*`, so it could not ship |
 | `apps/web/README.md` | upstream's (Deploy with Vercel, provider list) | the app's, crediting the upstream by description | it ships, and its URLs spell the slug (CM-O) |
 | `tasks/CM-1..4` | no `metadata` | `metadata.name` and `title` | `orun work check` (≥ v2.79) refused them |
+
+## The cirrus standard (CM5)
+
+Nothing about the storefront changed. What changed is the baseline around it:
+
+| What | Before | After | Why |
+|---|---|---|---|
+| orun pin | `kiox.yaml` (v2.15.0) + `kiox.lock`, shipped to every storefront | gone; orun is pinned where it runs, the `orun-action` `version:` in each workflow | nothing ran the kiox pin, and it disagreed with the lanes (v2.78.4) |
+| `root-kiox`, `root-kiox-lock` modules | in `01-product` | removed (`testing/phases.test.sh` and the rebrand's skip list follow) | a storefront is placed with 147 files (140 − 2 + 9): no kiox, plus the docs below |
+| component docs | none | `apps/web/docs/`, `infra/terraform/cloudflare-r2/docs/`, `tests/web/docs/` — `overview.md`, `architecture.md`, `runbook.md` | cirrus-baseline documents every component; the workspace Docs library renders `docs/` beside each `component.yaml` |
+| how the docs stay true | — | `tooling/catalog/gen-component-docs.py` derives them from the manifest, the Worker config, Terraform, migrations and package scripts; Baseline CI runs it with `--check` | a hand-written copy of a manifest drifts silently |
+| context pack | `operations.md`, `deployment.md` | plus `current.md`, `decisions.md`, `open-risks.md` | cirrus-baseline's shape; the three new pages are this repository's own and no module places them (the leak gate still allows exactly two) |
+| status | CM4 "this PR, to be tagged"; risk CM-B and design §2/§7 describing CM3's wrangler vars and calling CM-B open; the epic README's gate claiming an offline `plan` | CM4 shipped ([#5](https://github.com/sourceplane/commerce/pull/5)) and tagged `baseline-v1`; CM-B, design §2/§7 and "Around the template" say what CM4 built (no vars, request origin, `.env.example` only); the gate says offline is `validate` only | the documents had not caught up with the tag and with CM4 |
+
+## Verified (CM5)
+
+- `testing/{manifest,phases,coverage,rebrand,retouch,bootstrap-defer,wire}.test.sh`
+  green; `gen-component-docs.py --check` green (3 components, 9 pages).
+- `testing/leak.test.sh` at v2.58.11 (the blueprint job's pin): 147 files
+  derived (140 − 2 kiox + 9 docs pages); `ai/context` still exactly the two
+  declared pages; 140 shipped sources name no factory path, the generated
+  pages included, and none spells the slug outside an identity form.
+- `testing/placement.test.sh` at v2.78.4 (the lane pin, as `baseline.yml`
+  runs it — CM-Q): 147 files placed, two landings, branded and re-tenanted;
+  the product's own push-to-main plan applies `cloudflare-r2` (the `r2-data`
+  key) at level 0 and deploys `web` at level 1 on stage and prod; on a pull
+  request nothing waits; the 02-docs merge plans 0 jobs; `--resume` a no-op.
+- The Checks sequence: `pnpm install --frozen-lockfile`, `wire:fixture` (no
+  diff), typecheck, lint (0 errors, 6 warnings), test (6 files, 33 tests),
+  build green.
+- `testing/e2e.test.sh` at v2.78.4 green: the stage lane's four steps in the
+  staged job tree, the bucket bound from the stage document; `wrangler dev`
+  serves the demo storefront with no Shopify key — a product added to the
+  cart twice through the build's own server action, `/cart`, and checkout's
+  "Connect a payment provider".
+- `orun task check CM-6` complete.
 
 ## Verified (CM4)
 

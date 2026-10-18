@@ -23,13 +23,19 @@ one-line change to try.
 `SHOPIFY_STORE_DOMAIN`, `SHOPIFY_STOREFRONT_ACCESS_TOKEN` and
 `SHOPIFY_REVALIDATION_SECRET` are Worker secrets, set once per environment
 with `wrangler secret put` (README). The store domain is not secret, but it
-travels with the token: left unset, the storefront renders its un-configured
-state (upstream's "Shopify not configured" guards), whereas a placeholder
-domain in `vars` would make every page a 500. `COMPANY_NAME`, `SITE_NAME`
-and `SITE_URL` are wrangler vars. The deploy lane does not set the secrets
-(the `cloudflare-workers-assets-turbo` composition has no secret step): the
-first deploy without them serves the un-configured storefront, and the
-secrets take effect on the next request once set.
+travels with the token: left unset, the storefront serves its bundled demo
+catalogue (CM-N; through CM3, upstream's "Shopify not configured" state),
+whereas a placeholder domain in `vars` would make every page a 500. The
+deploy lane does not set the secrets (the `cloudflare-workers-assets-turbo`
+composition has no secret step): the first deploy without them serves the
+demo catalogue, and the secrets take effect on the next request once set.
+Automating them from orun secrets stays out of scope (design §7).
+
+The Worker has no wrangler `vars` since CM4. Through CM3 `COMPANY_NAME`,
+`SITE_NAME` and `SITE_URL` were vars; CM4 moved the store's name to
+`SITE_NAME` in `app/site.ts` (the rename seam), replaced `SITE_URL` with the
+request's own origin, and left `COMPANY_NAME` (the footer's copyright line)
+an optional var an owner may add.
 
 ## CM-C — The prerender cache and `populateCache` (RESOLVED)
 

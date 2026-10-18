@@ -29,8 +29,8 @@ sonner. `experimental.ppr`, `useCache` and `inlineCss` on a Next 15.6 canary.
 | ISR / stale-while-revalidate of cached routes | The Durable Object queue (`NEXT_CACHE_DO_QUEUE`): deduplicated re-renders requested from the Worker itself through `WORKER_SELF_REFERENCE` |
 | Partial prerendering (`experimental.ppr`) | Off. Next 16 merges `ppr` into `cacheComponents`, whose staged rendering the adapter cannot run on workerd yet (risk CM-A); `experimental.useCache` keeps the directives. Every storefront route renders at request time — as upstream's did, the root layout's cart promise having left no route a static shell |
 | `next/image` with `remotePatterns` for `cdn.shopify.com` | Unchanged config; the Worker's own `/_next/image` validates the URL and serves the CDN image unoptimised (no `IMAGES` binding) |
-| Project env vars in the Vercel dashboard | `COMPANY_NAME`, `SITE_NAME`, `SITE_URL` as wrangler `vars` in the template; `SHOPIFY_STORE_DOMAIN`, `SHOPIFY_STOREFRONT_ACCESS_TOKEN`, `SHOPIFY_REVALIDATION_SECRET` as Worker secrets, set once per environment |
-| `VERCEL_PROJECT_PRODUCTION_URL` (metadata base, robots, sitemap) | `SITE_URL` |
+| Project env vars in the Vercel dashboard | `SHOPIFY_STORE_DOMAIN`, `SHOPIFY_STOREFRONT_ACCESS_TOKEN`, `SHOPIFY_REVALIDATION_SECRET` as Worker secrets, set once per environment (optional since CM4: unset, the demo catalogue). Through CM3 `COMPANY_NAME`, `SITE_NAME` and `SITE_URL` were wrangler `vars`; since CM4 there are none — the name is `app/site.ts`, `COMPANY_NAME` an optional var (§9) |
+| `VERCEL_PROJECT_PRODUCTION_URL` (metadata base, robots, sitemap) | The request's own origin (`requestOrigin`, CM4; through CM3 a `SITE_URL` var) |
 | Cron | None upstream; none here |
 | Deploy on push | Orun: `apps/web/component.yaml` (`cloudflare-workers-assets-turbo`) deploys `commerce-web-{stage,prod}` on merge to `main` once the product is linked |
 
@@ -131,7 +131,8 @@ Cloudflare Images for `next/image` (an `images` binding away), a custom
 domain (the baseline's `cloudflare-domain` root), Shopify's customer
 accounts and checkout customisation (the template hands off to Shopify's
 checkout URL), the alternative commerce providers upstream lists, and
-automating the Worker secrets from orun secrets (open in risk CM-B).
+automating the Worker secrets from orun secrets (risk CM-B, resolved: they
+stay Worker secrets an owner sets once per environment, and are optional).
 
 ## 8. Alternatives rejected
 
