@@ -8,7 +8,7 @@ The upstream code stays the code: `lib/shopify` (queries, mutations, reshaping, 
 
 | Field | Value |
 |-------|-------|
-| Status | ✅ Shipped — CM0–CM4 landed (#1–#5), tagged `baseline-v1`; CM5 (the cirrus standard, CM-6) on `main`, not yet tagged. R2 apply and live deploy proven only by a live bootstrap (risk CM-P) |
+| Status | ✅ Shipped — CM0–CM4 landed (#1–#5), tagged `baseline-v1`; CM5 (the cirrus standard, CM-6 #6 and CM-7 #7) tagged `baseline-v2`. R2 apply and live deploy proven only by a live bootstrap (risk CM-P) |
 | Cluster | **CM** (CM0–CM5) |
 | Owner(s) | `apps/web` (the storefront) · `tests/web` (client + webhook tests) · `infra/terraform/cloudflare-r2` (the cache bucket) |
 | Builds on | `cirrus-baseline` conventions — intent, components, the Checks lane, the gated Orun lane; the factory's `cloudflare-r2` root and `tooling/wire` renderer |
@@ -16,7 +16,7 @@ The upstream code stays the code: `lib/shopify` (queries, mutations, reshaping, 
 | Changes | Adds the Workers build, the cache bindings, the monorepo wrapper, tests, the R2 root and the deploy contract; the storefront's code is untouched except where Next 16 or Workers force a change (status file) |
 | Decisions locked | (1) OpenNext on Workers + Static Assets. (2) Incremental cache in R2, tag cache and queue in Durable Objects — no D1, no KV. (3) `wrangler.jsonc` is rendered per environment from the R2 root's wiring document — and, since CM4, committed as the fixture render, because the deploy lane checks it exists before the build (risk CM-J). (4) The Shopify facts are Worker secrets set once per environment; the deploy lane does not set them — and, since CM4, optional: without them the storefront serves a bundled demo catalogue (risk CM-N). (5) `experimental.useCache`, not `cacheComponents`, until the adapter runs staged renders. (6) CM4: one landing — the plan, not a landing boundary, orders the bucket before the Worker; the R2 root has its own `r2-data` key (risk CM-L). |
 | Gate | CM1 is the first user-visible rung. CM2 needs a workspace with a Cloudflare connection to plan and apply (the root's plan lists the account's buckets, `adopt.tf`); offline it is held to `terraform validate`. |
-| Shipped as | `baseline-v1` ([#5](https://github.com/sourceplane/commerce/pull/5)), then CM5 on `main`; proven offline (Baseline CI), deploy gated until a workspace is linked |
+| Shipped as | `baseline-v1` ([#5](https://github.com/sourceplane/commerce/pull/5)), then `baseline-v2` (CM5: [#6](https://github.com/sourceplane/commerce/pull/6), [#7](https://github.com/sourceplane/commerce/pull/7)); proven offline (Baseline CI), deploy gated until a workspace is linked |
 
 ## Read order
 
@@ -34,4 +34,4 @@ The upstream code stays the code: `lib/shopify` (queries, mutations, reshaping, 
 | CM2 — the cache infrastructure from Terraform | `infra/terraform/cloudflare-r2`, the app's `secretEnv` and `dependsOn` | the root validates; the wiring keys match the template |
 | CM3 — ready to instantiate | README, as-built status | a reader can run, test, preview, connect Shopify and deploy it |
 | CM4 — a baseline, in one landing | card, build document, rename, bootstrap tooling, tests; the demo catalogue, cart page and checkout notice | a new storefront goes from nothing to live in one landing with no third-party key, the R2 bucket applied before the Worker; Baseline CI green |
-| CM5 — the cirrus standard | no kiox, generated component docs, the context pack, status that agrees with the tags | Baseline CI green with the docs check |
+| CM5 — the cirrus standard | no kiox, generated component docs, the context pack, status that agrees with the tags; the subdomain read from the Cloudflare connection | Baseline CI green with the docs check; the card asks for no subdomain |

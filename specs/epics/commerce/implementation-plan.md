@@ -95,6 +95,11 @@ storefront itself changing.
   repository's own, so no module places them.
 - **Status that agrees with the tags.** CM4 is shipped and tagged; CM-B and
   the design's mapping say what CM4 built.
+- **The subdomain from the Cloudflare connection (CM-7).** The card declares
+  `subdomain` as `from: connection.cloudflare.workersSubdomain`, as
+  cirrus-baseline does since baseline-v23, so the console asks for nothing the
+  connection already knows; `testing/manifest.test.sh` requires the source's
+  provider in `spec.requires.integrations`.
 
 **Done when**
 - `git grep -i kiox` finds nothing outside this milestone's own record
