@@ -10,7 +10,7 @@ the code departed from `design.md` or from the upstream template.
 | CM2 — the cache infrastructure from Terraform | ✅ Shipped (validated; apply gated on a linked workspace) | [#3](https://github.com/sourceplane/commerce/pull/3) |
 | CM3 — ready to instantiate | ✅ Shipped | [#4](https://github.com/sourceplane/commerce/pull/4) |
 | CM4 — a baseline, in one landing | ✅ Shipped (offline-proven; no live bootstrap yet, risk CM-P) | [#5](https://github.com/sourceplane/commerce/pull/5) (CM-5), tagged `baseline-v1` |
-| CM5 — the cirrus standard | ✅ Shipped | CM-6 — on `main` after `baseline-v1`, not yet tagged |
+| CM5 — the cirrus standard | ✅ Shipped | [#6](https://github.com/sourceplane/commerce/pull/6) (CM-6), [#7](https://github.com/sourceplane/commerce/pull/7) (CM-7), tagged `baseline-v2` |
 
 ## Departures from the upstream template
 
@@ -150,6 +150,44 @@ Nothing about the storefront changed. What changed is the baseline around it:
 | how the docs stay true | — | `tooling/catalog/gen-component-docs.py` derives them from the manifest, the Worker config, Terraform, migrations and package scripts; Baseline CI runs it with `--check` | a hand-written copy of a manifest drifts silently |
 | context pack | `operations.md`, `deployment.md` | plus `current.md`, `decisions.md`, `open-risks.md` | cirrus-baseline's shape; the three new pages are this repository's own and no module places them (the leak gate still allows exactly two) |
 | status | CM4 "this PR, to be tagged"; risk CM-B and design §2/§7 describing CM3's wrangler vars and calling CM-B open; the epic README's gate claiming an offline `plan` | CM4 shipped ([#5](https://github.com/sourceplane/commerce/pull/5)) and tagged `baseline-v1`; CM-B, design §2/§7 and "Around the template" say what CM4 built (no vars, request origin, `.env.example` only); the gate says offline is `validate` only | the documents had not caught up with the tag and with CM4 |
+
+### The subdomain from the Cloudflare connection (CM-7)
+
+`subdomain` was the one input an operator typed that the platform could
+answer itself: it belongs to the Cloudflare account the same way its id does,
+and it has exactly one right answer. A typed one could only be wrong, and
+wrong showed up after deploy — in the deploy's smoke (its `DEPLOYED_URL`), the
+phase probes and the console's verify URLs. `blueprint.yaml` now declares
+`from: connection.cloudflare.workersSubdomain`, as cirrus-baseline does since
+baseline-v23: the Cloudflare integration reads the subdomain at connect and on
+its hourly health check, and the bootstrap door fills the input from the
+connection the build is bound to — the same one `CLOUDFLARE_ACCOUNT_ID` and the
+deploy tokens mint from. The console renders no field for it, and an account
+with no workers.dev subdomain is refused at the door with the fix named.
+
+- `testing/manifest.test.sh` takes cirrus-baseline's rule verbatim: the source
+  is accepted, and only when `spec.requires.integrations` lists its provider.
+- `repo-blueprint.yaml` keeps the input and its default; it, `BOOTSTRAP.md`
+  and `docs/phases/README.md` say only a hand-run build passes
+  `--set subdomain`.
+- Nothing a storefront carries changes: the rename writes the value where it
+  always did (`workersDevSubdomain`, the URLs), and the probes read it as
+  before.
+
+Verified:
+
+- `testing/{manifest,phases,coverage,rebrand,retouch,bootstrap-defer,wire}.test.sh`
+  green; `gen-component-docs.py --check` green (3 components).
+- Mutation: with `cloudflare` dropped from `spec.requires.integrations`,
+  `manifest.test.sh` fails with exactly one finding, naming
+  `inputs[subdomain]`; restored, it passes.
+- `orun new --status` at v2.58.11: `01-product` pending, 147 files.
+  `testing/leak.test.sh` at v2.58.11: 147 files derived; 140 shipped sources
+  name no factory path. `testing/placement.test.sh` at v2.78.4: 147 files
+  placed, two landings; the product's own plan applies `cloudflare-r2` at
+  level 0 and deploys `web` at level 1 on stage and prod; the 02-docs merge
+  plans 0 jobs; `--resume` a no-op.
+- `orun task check CM-7` complete.
 
 ## Verified (CM5)
 

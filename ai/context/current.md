@@ -21,8 +21,8 @@ provider.
 
 | | |
 |---|---|
-| Latest tag | `baseline-v1` (CM4, [#5](https://github.com/sourceplane/commerce/pull/5)) |
-| On `main` since | CM5 — the cirrus standard (no kiox, generated component docs, this context pack) |
+| Latest tag | `baseline-v2` (CM5 — the cirrus standard, [#6](https://github.com/sourceplane/commerce/pull/6) and [#7](https://github.com/sourceplane/commerce/pull/7): no kiox, generated component docs, this context pack, and the workers.dev subdomain read from the Cloudflare connection instead of asked) |
+| Before it | `baseline-v1` (CM4, [#5](https://github.com/sourceplane/commerce/pull/5)) |
 | Proven live | No. Everything short of the platform is proven offline in Baseline CI; the tokens minted, a real R2 apply, a real `wrangler deploy` with the bucket and Durable Object bindings, the probes and a real Shopify store are still to come (risks CM-P, CM-M) |
 
 ## Where to read
@@ -37,7 +37,6 @@ provider.
 
 ## Next
 
-1. Bootstrap one storefront from the next tag against a workspace and record
+1. Bootstrap one storefront from `baseline-v2` against a workspace and record
    its timings; its deploy answers CM-M, and it closes CM-P. Connect a Shopify
    development store to it once.
-2. Cut the next `baseline-vN` with `tag.yml` so the registry can pin CM5.
