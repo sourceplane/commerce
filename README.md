@@ -24,7 +24,7 @@ milestones and the as-built status.
 git clone --depth 1 --branch <baseline-tag> https://github.com/sourceplane/commerce
 cd commerce
 orun new --blueprint repo-blueprint.yaml --out ~/sites/acme-shop --run-hooks --resume \
-  --set reponame=acme-shop --set productname="Acme Shop" --set productdomain=shop.acme.dev \
+  --set reponame=acme-shop --set productname="Acme Shop" \
   --set githuborg=acme-inc --set subdomain=<workers-dev-subdomain>
 ```
 
