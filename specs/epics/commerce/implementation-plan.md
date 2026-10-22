@@ -108,6 +108,15 @@ storefront itself changing.
 - the docs check is green in Baseline CI
 - this file, the status file and `epic.yaml` agree
 
+## CM6 — the domain is set later (CM-8) ✅
+
+**Done when** the console card asks for no domain; `productdomain` is an
+optional build input, empty by default; a store built without one is branded
+with the reserved placeholder `<reponame>.example.com` where the domain goes
+(`BASE_DOMAIN` in `intent.yaml`) and its README says how an owner sets the real one;
+Baseline CI places, leak-checks and plans a store built with no domain.
+Shipped in `baseline-v3`.
+
 ## After CM4 (outside this repository)
 
 1. Cut `baseline-v1` with `tag.yml` from the merged `main`. ✅ Done.

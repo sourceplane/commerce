@@ -11,6 +11,7 @@ the code departed from `design.md` or from the upstream template.
 | CM3 — ready to instantiate | ✅ Shipped | [#4](https://github.com/sourceplane/commerce/pull/4) |
 | CM4 — a baseline, in one landing | ✅ Shipped (offline-proven; no live bootstrap yet, risk CM-P) | [#5](https://github.com/sourceplane/commerce/pull/5) (CM-5), tagged `baseline-v1` |
 | CM5 — the cirrus standard | ✅ Shipped | [#6](https://github.com/sourceplane/commerce/pull/6) (CM-6), [#7](https://github.com/sourceplane/commerce/pull/7) (CM-7), tagged `baseline-v2` |
+| CM6 — the domain is set later | ✅ Shipped | [#8](https://github.com/sourceplane/commerce/pull/8) (CM-8), tagged `baseline-v3` |
 
 ## Departures from the upstream template
 
@@ -188,6 +189,58 @@ Verified:
   level 0 and deploys `web` at level 1 on stage and prod; the 02-docs merge
   plans 0 jobs; `--resume` a no-op.
 - `orun task check CM-7` complete.
+
+## The domain is set later (CM6, CM-8)
+
+The console asked for the store's domain, with help text that said it did not
+need to exist — and nothing in the build needed one: the store answers on
+workers.dev from its first deploy, builds its absolute links (canonical,
+sitemap, robots, Open Graph) from the request it is answering, and the smoke
+and the phase probes read workers.dev. The one place the repository names the
+domain is `BASE_DOMAIN` in `intent.yaml` (one line per environment: dev,
+stage, prod). A domain is an owner's step after the bootstrap (README,
+"Custom domain"), so the form no longer asks for it.
+
+- `blueprint.yaml` declares no `productdomain` input; the console asks for
+  the store's name alone.
+- `repo-blueprint.yaml`'s `productdomain` is optional, default empty. Nothing
+  else in the build reads it — no hook, probe or `when:` — so an empty value
+  is harmless; `.rebrand/values.json` records `""`. A hand-run build may still
+  pass `--set productdomain=` for a store that already has its domain.
+- `rebrand.mjs` no longer requires it. Empty, it brands the reserved
+  placeholder `<reponame>.example.com` (RFC 2606 — never someone else's
+  domain) where the domain goes, so setting it later is replacing one
+  string; the product README and `ai/context/operations.md` say so (the
+  README's "nothing in the repository changes" now names that one string).
+- `testing/fixtures/acme.json` carries no domain, so the leak gate, the
+  offline bootstrap and the e2e tier exercise exactly what a console build
+  supplies. Its slug, `acme-commerce`, makes the placeholder
+  `acme-commerce.example.com`, which ENDS in the baseline's own
+  `commerce.example.com`; `testing/rebrand.test.sh` pins that it survives
+  three passes, beside the placeholder for an absent and an empty domain.
+  `baseline.yml`'s blueprint read sets no domain.
+
+Nothing that needs a domain was removed — it waits for one.
+
+Verified:
+
+- `testing/{manifest,phases,coverage,rebrand,retouch,bootstrap-defer,wire}.test.sh`
+  green (rebrand: with the previous `rebrand.mjs` the three new checks fail;
+  restored, they pass); `gen-component-docs.py --check` green (3 components).
+- At v2.58.11 (the blueprint job's pin): `orun new --status` with no
+  `productdomain` reads the document (`01-product` pending, 147 files);
+  `testing/leak.test.sh` 147 files derived; 140 shipped sources name no
+  factory path.
+- At v2.78.4 (the placement pin): `testing/placement.test.sh` 147 files
+  placed, two landings; the store's own plan applies `cloudflare-r2` at
+  level 0 and deploys `web` at level 1 on stage and prod; the 02-docs merge
+  plans 0 jobs; `--resume` a no-op.
+- The offline bootstrap of the fixture leaves `.rebrand/values.json`
+  `productdomain` empty and `BASE_DOMAIN: acme-commerce.example.com` in all
+  three environments of the store's `intent.yaml` (and the same string in its
+  README and `operations.md`); no line names `commerce.example.com` on its
+  own.
+- `orun task check CM-8` complete.
 
 ## Verified (CM5)
 

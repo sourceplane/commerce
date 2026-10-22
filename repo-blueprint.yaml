@@ -36,11 +36,17 @@ inputs:
     description: The store's display name (e.g. "Acme Shop") — the navbar, the footer, every page title and the Open Graph image.
   productdomain:
     type: string
-    required: true
+    default: ""
     description: >-
-      The domain the site will answer on (e.g. acme.dev) — BASE_DOMAIN and the
-      custom-domain guidance. It does not need to exist: the site answers on
-      workers.dev from its first deploy.
+      The store's own domain, once it has one (e.g. shop.acme.dev). NOT ASKED:
+      the store answers on workers.dev from its first deploy and builds its
+      absolute links from the request it is answering, and a domain is an
+      owner's step after it. Empty, the rebrand writes the reserved
+      placeholder `<reponame>.example.com` where the domain goes (BASE_DOMAIN
+      in intent.yaml, for every environment), so setting it later is
+      replacing that one string — the store's README, "Custom domain", says
+      how. Pass it with --set only to brand a hand-run build with a domain it
+      already has.
   githuborg:
     type: string
     pattern: "^[A-Za-z0-9][A-Za-z0-9-]*$"

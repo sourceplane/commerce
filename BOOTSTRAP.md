@@ -61,7 +61,7 @@ cd commerce
 orun new --blueprint repo-blueprint.yaml \
   --out ~/sites/acme-shop --run-hooks --resume \
   --set reponame=acme-shop --set productname="Acme Shop" \
-  --set productdomain=shop.acme.dev --set githuborg=acme-inc \
+  --set githuborg=acme-inc \
   --set orunWorkspace=ws_XXXXXXXX \
   --set subdomain=<workers-dev-subdomain>
 ```
@@ -98,9 +98,13 @@ orun new --blueprint repo-blueprint.yaml --out ~/sites/acme-shop --run-hooks \
 
 `02-docs` reads the identity back from `.rebrand/values.json` in the placed
 tree, but the blueprint's **required** inputs — `reponame`, `productname`,
-`productdomain`, `githuborg` — are validated before anything runs, so pass
-them every time (a `--values` file is easier). The full guide, one page per
-phase: [docs/phases/README.md](docs/phases/README.md).
+`githuborg` — are validated before anything runs, so pass them every time (a
+`--values` file is easier). The domain is not one of them: the store goes live
+on workers.dev, and `productdomain` defaults to empty, which brands the
+reserved placeholder `<reponame>.example.com` into `BASE_DOMAIN` for an owner
+to replace when they attach a domain (README, "Custom domain"). Pass
+`--set productdomain=` only for a store that already has its domain.
+The full guide, one page per phase: [docs/phases/README.md](docs/phases/README.md).
 
 | flag | what it does |
 |---|---|
@@ -255,7 +259,7 @@ at the tag and refuses the whole catalogue if it 404s.
 | The live store shows the demo banner | no Shopify store is connected — expected after a bootstrap. The product's README, "Connecting Shopify" |
 | The product's `intent.yaml` says `workspace: ws_SET_ME` | `orunWorkspace` was empty and the build ran outside a workspace; set it and re-run `01-product` |
 | A bootstrap stopped before `02-docs`; prod no longer waits on stage | the gate is deferred, not dropped: run `02-docs`, or `node tooling/bootstrap/promotion.mjs --restore --file <product>/intent.yaml` |
-| `✕ input "productdomain" is required` | all four required inputs must be set on every invocation, single-phase ones included |
+| `✕ input "productname" is required` | all three required inputs (`reponame`, `productname`, `githuborg`) must be set on every invocation, single-phase ones included |
 | `unknown flag: --phase` or a parse error in the blueprint | the CLI is below the v2.58.11 floor |
 | web lane `verify-app-structure` fails on `wrangler.jsonc` | the config is not committed. It is the fixture render of `wrangler.template.jsonc`: `pnpm run wire:fixture` and commit it |
 | web lane `build-app`: `Symlink apps/web/node_modules/next is invalid, it points out of the filesystem root` | the product's intent pins stack-tectonic ≥ 0.20.0, whose lane-scoped install links each job's node_modules out of its tree, which Next 16's Turbopack refuses. Pin 0.19.0 (`intent.yaml` says why) |

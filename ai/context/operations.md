@@ -141,7 +141,7 @@ orun integrations list --org <ws> --json && orun cloud check --org <ws>
 | redeploy without a change | edit the last line of `apps/web/component.yaml` (`# orun: redeploy <reason> <stamp>`) and merge — it is a deploy trigger, nothing reads it |
 | empty the data cache | revalidate through the webhook route (a `products/update` or `collections/update` topic), or delete the bucket's `incremental-cache/` objects |
 | add a binding (D1, KV, another bucket) | a Terraform root under `infra/terraform/` that publishes `WIRING_<ROOT>`, a token in `wrangler.template.jsonc`, its fixture entry, the root in the build's `--components`, the `WIRING_<ROOT>_<ENV>` secretEnv and an enforced `dependsOn` on it in `apps/web/component.yaml` |
-| serve a custom domain | attach it to the Worker in Cloudflare (README, "Custom domain"); nothing in the repository changes |
+| serve a custom domain | attach it to the Worker in Cloudflare (README, "Custom domain"), then replace the placeholder `commerce.example.com` in `intent.yaml`'s `BASE_DOMAIN` with it |
 | add a runtime secret | `wrangler secret put <KEY> --name commerce-web-<env>` for the Worker; `orun secrets set <KEY> --org <ws> --env <env>` for a lane |
 | headless credentials | `ORUN_TOKEN` (workspace-scoped) + `GITHUB_TOKEN` |
 

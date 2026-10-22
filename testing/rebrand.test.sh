@@ -96,6 +96,14 @@ check "a fixture's bucket name follows the same rule" \
 check "the placeholder domain is the product's domain, not a renamed slug" \
   "$acme" intent.yaml '      BASE_DOMAIN: commerce.example.com' \
   '      BASE_DOMAIN: shop.acme.dev'
+check "no domain given: the reserved placeholder, for an owner to replace later" \
+  '{"reponame":"acme-shop","productname":"Acme Shop","githuborg":"acme-inc","subdomain":"acme"}' \
+  intent.yaml '      BASE_DOMAIN: commerce.example.com' \
+  '      BASE_DOMAIN: acme-shop.example.com'
+check "an empty domain is no domain" \
+  '{"reponame":"acme-shop","productname":"Acme Shop","productdomain":""}' \
+  intent.yaml '      BASE_DOMAIN: commerce.example.com' \
+  '      BASE_DOMAIN: acme-shop.example.com'
 check "the repo slug" \
   "$acme" package.json '  "name": "commerce",' \
   '  "name": "acme-shop",'
@@ -145,6 +153,10 @@ check "a slug that ENDS in the baseline's slug survives three passes (the e2e fi
 check "…and so does its bucket name" \
   "$prefixed" apps/web/wiring.fixture.json '"r2_bucket_name": "stg-commerce-stage"' \
   '"r2_bucket_name": "stg-acme-commerce-stage"' 3
+check "…and, with no domain, its placeholder (which ends in the baseline's domain)" \
+  '{"reponame":"acme-commerce","productname":"Sam'"'"'s Tees & Mugs","githuborg":"acme-inc","subdomain":"acme"}' \
+  intent.yaml '      BASE_DOMAIN: commerce.example.com' \
+  '      BASE_DOMAIN: acme-commerce.example.com' 3
 
 # --verify runs in every phase. Without the product's values it cannot tell
 # the product's own identity from a leftover; with them it can. A real

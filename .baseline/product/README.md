@@ -170,5 +170,9 @@ The store answers on workers.dev from its first deploy. To serve it on your
 own domain, add the domain to the Cloudflare account the store deploys into
 and attach it to the Worker (dashboard → Workers & Pages →
 `commerce-web-prod` → Settings → Domains & Routes → Add → Custom domain), and
-point Shopify's webhooks at it. Nothing in the repository changes: the store
-builds its absolute links from the request it is answering.
+point Shopify's webhooks at it. The store builds its absolute links from the
+request it is answering, so nothing else has to change; the repository names
+the domain in one place, `BASE_DOMAIN` in `intent.yaml` (one line per
+environment), which the store was born with as the reserved placeholder
+`commerce.example.com`. Replace it with your domain in the same change that
+records it.
