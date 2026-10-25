@@ -17,7 +17,7 @@ says plainly that a payment provider must be connected first.
 
 <!-- 02-docs:begin -->
 Not recorded yet. The bootstrap's last phase writes the live URLs, the
-workspace and the secrets inventory into
+workspace and the secrets the store uses into
 [ai/context/deployment.md](ai/context/deployment.md); how the store deploys
 and how to operate it is in
 [ai/context/operations.md](ai/context/operations.md).
@@ -122,9 +122,9 @@ revalidation of stale routes, through the Worker's own
 local work and verification, and on every deploy from the document the
 `cloudflare-r2` Terraform root publishes after its apply
 (`WIRING_CLOUDFLARE_R2`, per environment). Edit the template, then
-`pnpm run wire:fixture`; Checks fails if the committed `wrangler.jsonc` is not
-the fixture render. The Durable Objects need no root: the migration in the
-config creates them on the first deploy.
+`pnpm run wire:fixture` and commit the render with the template. The Durable
+Objects need no root: the migration in the config creates them on the first
+deploy.
 
 ## How it deploys
 
@@ -136,9 +136,11 @@ storefront builds with that environment's bucket name and deploys — to
 only verifies. The Worker is `commerce-web-<env>` on your account's
 workers.dev subdomain, and every deploy is smoke-tested over HTTP: the home
 page must answer, and `robots.txt` must name the origin it was asked on, which
-only the Worker renders. `checks.yml` runs install, the fixture render,
-typecheck, lint, test and build on every pull request. (A push to `main` runs
-`ci.yml` alone, which applies, builds and deploys.)
+only the Worker renders. A pull request runs the same pipeline's verify lanes,
+with nothing applied or deployed: the R2 bucket planned for stage and prod,
+and the storefront built and dry-deployed for each environment. They do not
+run the tests or the linter — run those before you push (Getting started,
+above). (A push to `main` applies, builds and deploys.)
 
 The pipeline holds one credential, GitHub's own `GITHUB_TOKEN`. The Cloudflare
 tokens and account id are brokered per run from the workspace's Cloudflare

@@ -10,9 +10,16 @@
 # before the Worker that binds it — is carried by the plan instead, and this
 # file checks the edges that carry it: every component that reads a wiring
 # document waits, on a merge to main, for the infra component that publishes
-# it, and the landing's await checks that document exists afterwards. A
-# module that drifts into another phase, or an edge that goes missing, fails
-# at landing time, live, with nothing in this repository having looked wrong.
+# it. Each reader resolves its document in the convergence from the place
+# every later run looks, so a green convergence says the document is there —
+# no separate check. A module that drifts into another phase, or an edge that
+# goes missing, fails at landing time, live, with nothing in this repository
+# having looked wrong.
+#
+# And the shape that keeps a bootstrap fast (orun >= v2.88.0): the run-level
+# task set-up runs in the background, each phase finds its task just before
+# its landing, each landing checks its commit here (`checks: local`), and the
+# convergence watch reads every few seconds.
 #
 # Adapted from sourceplane/cirrus-baseline's testing/phases.test.sh: the
 # narration rules and the hook-only rule are Cirrus's, unchanged.
@@ -51,16 +58,19 @@ PARTITION = {
 HOOK_ONLY = {"02-docs"}
 # The phases that DEPLOY, and so must give a re-run something to land.
 DEPLOYS = {"01-product"}
-# Each phase's post and await hooks, in order — the one-landing recipe. The
-# `secret-*` reconciles are matched as a group (one per brokered key) and the
-# `wiring` await only when infra publishes wiring; both are checked below.
+# Each phase's pre, post and await hooks, in order — the one-landing recipe.
+# The brokered keys are one `secrets` reconcile. No phase has a `pre` hook:
+# the task is found in `post`, just before the landing, so that everything
+# before it runs beside the background task set-up. No phase awaits the
+# wiring: the storefront's deploy resolves it in the convergence (checked below).
+PRE = {"01-product": [], "02-docs": []}
 POST = {
     "01-product": ["retouch", "git-init", "stage", "rebrand", "orun-workspace", "work-tree",
-                   "promotion", "dev-lanes", "restage", "rebrand-verify", "pnpm-lockfile",
-                   "repo", "link", "secret-*", "land"],
-    "02-docs": ["promotion", "dev-lanes", "render", "land"],
+                   "promotion", "dev-lanes", "restage", "rebrand-verify",
+                   "repo", "link", "secrets", "task", "land"],
+    "02-docs": ["promotion", "dev-lanes", "render", "task", "land"],
 }
-AWAIT = {"01-product": ["converge", "wiring", "verify"], "02-docs": ["verify"]}
+AWAIT = {"01-product": ["converge", "verify"], "02-docs": []}
 
 by_name = {p["name"]: p for p in phases}
 names = [p["name"] for p in phases]
@@ -140,15 +150,13 @@ for p in phases:
                 f"commit it merged (orun.run/watch@v1 with sha: mergeSha)")
 
 # ── the hooks run in the one-landing order ────────────────────────────────
-def collapse(ids):
-    out = []
-    for i in ids:
-        i = "secret-*" if i.startswith("secret-") else i
-        if not out or out[-1] != i or i != "secret-*":
-            out.append(i)
-    return out
+for name, want in PRE.items():
+    got = [h.get("id") for h in ((by_name.get(name, {}).get("hooks") or {}).get("pre") or [])]
+    if got != want:
+        bad(f"phase {name}'s pre hooks are {got}; want {want} — a task found in `pre` waits "
+            f"for the background task set-up before the phase has done anything")
 for name, want in POST.items():
-    got = collapse([h.get("id") for h in ((by_name.get(name, {}).get("hooks") or {}).get("post") or [])])
+    got = [h.get("id") for h in ((by_name.get(name, {}).get("hooks") or {}).get("post") or [])]
     if got != want:
         bad(f"phase {name}'s post hooks are {got}; the one-landing order is {want}")
 for name, want in AWAIT.items():
@@ -206,18 +214,63 @@ for name, (rel, spec) in comps.items():
                         if (m.get("from") or "").rstrip("/") == comps[pub][0].rsplit("/", 1)[0]), None)
         if mod and pub_mod and pub_mod not in (mod.get("dependsOn") or []):
             bad(f"module {mod['name']} reads {key} and is not placed after {pub_mod} (module dependsOn)")
-# …and the landing's await asks the platform that every one of them exists.
+# …and every document published is one a component in the convergence
+# resolves, on stage AND prod, from the place every later run looks (its
+# secretEnv: `secret://<project>/<project>/<env>/WIRING_X`). That read is what
+# replaced the `wiring` await: a job resolves its secrets when it starts,
+# fail-closed, so a green convergence says every one of them is there. A
+# document nothing reads in the convergence would need the await back.
+read_from = {}
+for name, (rel, spec) in comps.items():
+    for env_key, ref in (spec.get("secretEnv") or {}).items():
+        m = re.match(r"^secret://[^/]+/[^/]+/(stage|prod)/(WIRING_[A-Z0-9_]+)$", str(ref))
+        if m:
+            read_from.setdefault(m.group(2), set()).add(m.group(1))
+for key in sorted(publishes):
+    if read_from.get(key, set()) != {"stage", "prod"}:
+        bad(f"{key} is published and no component resolves it on both stage and prod "
+            f"(it is read on {sorted(read_from.get(key, set())) or 'none'}) — nothing in the "
+            f"convergence proves it is there; read it, or await it with orun.secrets/exists@v1")
 for p in phases:
-    if p["name"] not in DEPLOYS:
-        continue
-    exists = [h for h in ((p.get("hooks") or {}).get("await") or [])
-              if (h.get("uses") or "").startswith("orun.secrets/exists@")]
-    keys = {k for h in exists for k in ((h.get("with") or {}).get("keys") or [])}
-    envs = {e for h in exists for e in ((h.get("with") or {}).get("environments") or [])}
-    if set(publishes) - keys:
-        bad(f"phase {p['name']} does not await the wiring {sorted(set(publishes) - keys)} with orun.secrets/exists@v1")
-    if publishes and envs != {"stage", "prod"}:
-        bad(f"phase {p['name']} awaits the wiring on {sorted(envs)}, not stage and prod")
+    for h in hooks_of(p):
+        if (h.get("uses") or "").startswith("orun.secrets/exists@"):
+            keys = set((h.get("with") or {}).get("keys") or [])
+            proven = {k for k in keys if read_from.get(k, set()) >= {"stage", "prod"}}
+            if proven:
+                bad(f"phase {p['name']} awaits {sorted(proven)} with orun.secrets/exists@v1, which "
+                    f"the convergence's own lanes already resolve on stage and prod — a second check")
+
+# ── THE FAST SHAPE (orun >= v2.88.0) ──────────────────────────────────────
+# The run-level list is the task set-up, all of it in the background: the
+# first phase's provider check, placement, rebrand, repository and secrets
+# run while it opens the epic, the milestones and the tasks.
+for h in run_hooks:
+    if not h.get("background"):
+        bad(f"hooks.preInstantiate {h.get('id')} is not `background: true` — the first phase "
+            f"waits for it before doing anything, though nothing before its landing reads it")
+# No phase keeps a `pre` hook on the task plane: one there waits for the
+# whole background list before the phase has done anything.
+PLANE = ("orun.task/", "orun.pr/land@")
+for p in phases:
+    for h in ((p.get("hooks") or {}).get("pre") or []):
+        if (h.get("uses") or "").startswith(PLANE):
+            bad(f"phase {p['name']} pre hook {h.get('id')} uses the task plane ({h['uses']}) — "
+                f"move it to `post`, just before the landing")
+# Every landing checks its commit here and merges, instead of waiting for a
+# runner to plan the tree this box just wrote.
+for p in phases:
+    for h in hooks_of(p):
+        if (h.get("uses") or "").startswith("orun.pr/land@") and (h.get("with") or {}).get("checks") != "local":
+            bad(f"phase {p['name']} lands with checks {(h.get('with') or {}).get('checks', 'ci')!r}, "
+                f"not 'local' — it waits for a runner to plan a tree that is here")
+# The convergence watch reads every few seconds, not the action's default 40.
+for p in phases:
+    for h in ((p.get("hooks") or {}).get("await") or []):
+        if (h.get("uses") or "").startswith("orun.run/watch@"):
+            every = (h.get("with") or {}).get("pollSeconds")
+            if not isinstance(every, int) or every > 10:
+                bad(f"phase {p['name']} watches its convergence every {every or 40} s; at most 10 — "
+                    f"the build goes on that much after the run is green")
 
 # ── every phase's task is one the run-level list opens, in the same order ─
 def task_names(hooks):
@@ -312,8 +365,15 @@ def check_line(where, line, slot, hook_ids):
 for p in phases:
     n = p.get("narrate") or {}
     ids = {h.get("id") for h in hooks_of(p)}
+    awaits = bool((p.get("hooks") or {}).get("await"))
     for slot in ("start", "await", "done", "failed"):
         line = n.get(slot)
+        if slot == "await" and not awaits:
+            # A phase that waits on nothing never says its await line.
+            if line:
+                bad(f"phase {p['name']} declares narrate.await and has no await hooks — "
+                    f"nobody would ever read it")
+            continue
         if not line:
             bad(f"phase {p['name']} declares no narrate.{slot}")
             continue

@@ -26,7 +26,7 @@ metadata:
     bucket and deploys the storefront to stage and prod on merge. It serves a
     bundled demo catalogue and a cookie cart until the owner connects a
     Shopify store; checkout asks for a payment provider until then. One
-    provider, one consent. Live in about sixteen minutes, in one landing.
+    provider, one consent. Live in about fourteen minutes, in one landing.
   tags: [storefront, shopify, r2, cloudflare, nextjs, terraform]
 spec:
   source:
@@ -112,15 +112,15 @@ spec:
       # anything is created.
       from: connection.cloudflare.workersSubdomain
 
-  # ── PREVIEW ONLY. repo-blueprint.yaml's `orun.integrations/reconcile@v1`
-  # hooks mint these, brokered, during 01-product. ─────────────────────────
-  # Transcribed from those hooks' own `keys:` and `template:` values, so
-  # testing/manifest.test.sh compares this list to the document that mints
-  # them. The console renders them read-only: no credential is ever typed,
-  # shown or stored. Keys that already exist are kept. The bucket names are
-  # not here: they are not credentials, and the bucket's own apply publishes
-  # them. Nor are Shopify's: the platform does not broker them, and the
-  # storefront needs none to go live.
+  # ── PREVIEW ONLY. repo-blueprint.yaml's one `orun.integrations/reconcile@v1`
+  # hook (`secrets`) mints these, brokered, during 01-product. ──────────────
+  # Transcribed from that hook's own `secrets:` entries (each key and its
+  # template), in its order, so testing/manifest.test.sh compares this list
+  # to the document that mints them. The console renders them read-only: no
+  # credential is ever typed, shown or stored. Keys that already exist are
+  # kept. The bucket names are not here: they are not credentials, and the
+  # bucket's own apply publishes them. Nor are Shopify's: the platform does
+  # not broker them, and the storefront needs none to go live.
   secrets:
     - key: CLOUDFLARE_API_TOKEN
       provider: cloudflare
@@ -154,9 +154,9 @@ spec:
     # THE BUILD DOCUMENT. There is no umbrella workflow and no agent brief:
     # every phase is declared in it and orun runs it.
     blueprint: repo-blueprint.yaml
-    # Summed from the phases' expectedMinutes. An estimate until a bootstrap
-    # measures it.
-    expectedMinutes: 16
+    # Summed from the phases' expectedMinutes (13 + 1). An estimate until a
+    # bootstrap measures it: no build of this baseline has been timed.
+    expectedMinutes: 14
     tokenChannel: ORUN_TOKEN_FILE   # how a runner hands over its refreshed token
   verify:
     urls:
