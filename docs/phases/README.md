@@ -9,9 +9,13 @@ container the same operation as running them all.
 
 The product phase follows the contract every deploying phase does:
 
-> **place its modules → brand them → land them as one pull request → watch
-> the convergence that merge triggers (auto-resumed) → check what the
-> convergence published → verify the outcome over HTTP.**
+> **place its modules → brand them → check them in the box and land them as
+> one pull request → watch the convergence that merge triggers
+> (auto-resumed) → verify the outcome over HTTP.**
+
+The run's task set-up — the epic, a milestone per phase, a task per landing
+— runs in the background from the start; the first hook that needs it, the
+phase's `task`, waits for it.
 
 Run from the baseline checkout (the blueprint's source is `path: .`); the
 site's repository is wherever `--out` points.
@@ -20,7 +24,7 @@ site's repository is wherever `--out` points.
 
 | phase | lands | verified by |
 |---|---|---|
-| [`01-product`](01-product.md) | **the GitHub repo created** and the whole product in ONE pull request: intent, CI, tooling, identity, the R2 root, the storefront and its tests | the convergence green (R2 applied, then the storefront built, deployed and smoke-tested), `WIRING_CLOUDFLARE_R2` on stage and prod, both URLs answering |
+| [`01-product`](01-product.md) | **the GitHub repo created** and the whole product in ONE pull request: intent, CI, tooling, identity, the R2 root, the storefront and its tests | the convergence green (R2 applied, then the storefront built, deployed and smoke-tested), both URLs answering |
 | [`02-docs`](02-docs.md) | the live-deployment record; the promotion gate and dev's lanes put back | committed manifest matches probed reality |
 
 **One landing, not three.** Before the one-landing shape a site like this
@@ -35,12 +39,16 @@ published is there. On a pull request the edge is advisory: nothing deploys.
 the product's own plan honours it.
 
 Every landing is a pull request on a branch named for its task
-(`orun/BASE-<n>-<phase>`). On those branches `ci.yml` runs `plan` only — the
-intent, every component and every composition resolve — and skips the lanes,
+(`orun/BASE-<n>-<phase>`), checked before it is pushed: `orun validate`, then
+`orun plan` as the pull request and as the merge would plan it, in the box,
+in under a second (`checks: local`). Then it merges; nothing waits for the
+PR's CI. On those branches `ci.yml` runs `plan` only and skips the lanes,
 because the merge runs them on main a minute later, for real, and that
-convergence is what the phase watches. `checks.yml` (install, the fixture
-render, typecheck, lint, test, build) runs on every pull request regardless,
-and the product's landing waits for it.
+convergence is what the phase watches. The product carries no other
+workflow: the baseline's own CI (Tier 2) installs, renders the fixture,
+type-checks, lints, tests and builds this landing before a tag is cut, and
+every later pull request in the product runs `ci.yml`'s verify lanes (which
+build and dry-deploy, but neither lint nor run the tests).
 
 There is no custom-domain phase. Attaching a domain to a Worker needs zone
 permissions the platform's brokered `workers-deploy` token does not carry, so
@@ -100,9 +108,10 @@ lands, its `post` hooks make them the site's:
    the two bootstrap deferrals (prod's promotion gate, dev's push lanes),
    restage, `rebrand --verify` — the identity rename over the whole tree,
    then a sweep that fails on any of this baseline's identity left behind.
-3. `pnpm install --lockfile-only` — confirms the baseline's complete
-   lockfile against the placed tree, so `--frozen-lockfile` installs pass.
-4. `repo`, `link`, the brokered Cloudflare credentials, `land`.
+3. `repo`, `link`, the brokered Cloudflare credentials (the deploy token,
+   the R2 token and the account id, one `secrets` hook), `task`, `land`. The
+   baseline's lockfile is placed as it is and installed `--frozen-lockfile`
+   by the lanes; nothing re-resolves it.
 
 ## When a phase fails
 

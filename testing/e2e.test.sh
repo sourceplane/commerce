@@ -5,11 +5,11 @@
 # This proves it WORKS, by doing to it what its own pipelines will:
 #
 #   1. at the 01-product landing (the commit its one pull request merges),
-#      run what `checks.yml` runs on that PR — install with the lockfile the
-#      phase confirmed, render the wrangler fixture and check the committed
-#      config IS that render, typecheck, lint, test, build. The landing WAITS
-#      on those checks, so a product they refuse is a bootstrap that never
-#      merges;
+#      install with the lockfile the product ships, render the wrangler
+#      fixture and check the committed config IS that render, typecheck,
+#      lint, test, build. The landing's own PR runs `plan` alone (an
+#      `orun/BASE-*` branch), so THIS is where a product those steps refuse
+#      is caught: before the tag, not after a build has merged it;
 #   2. the stage lane's own steps, rendered by `orun plan` in the product for
 #      a pull request (the verify profile: the deploy profile has no dry run)
 #      — `verify-app-structure` (which checks the wrangler config exists
@@ -72,24 +72,29 @@ values="$here/fixtures/acme.json"
 repo="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['reponame'])" "$values")"
 export CI=1 WRANGLER_SEND_METRICS=false NEXT_TELEMETRY_DISABLED=1 TURBO_TELEMETRY_DISABLED=1
 
-# What checks.yml runs, step for step, read out of the workflow the product
-# carries so the two cannot drift: every `run:` of its one job, in order.
+# The landing's own checks, step for step — the ones the product's retired
+# Checks workflow ran, run here at once on the whole tree. A product's pull
+# requests verify through ci.yml's lanes (the storefront built — Next's build
+# type-checks it — and dry-deployed per environment, the R2 root planned),
+# which neither lint nor run the tests, so before a tag THIS is where those
+# are held.
+LANDING_CHECKS=(
+  "pnpm install --frozen-lockfile"
+  "pnpm run wire:fixture"
+  "git diff --exit-code"
+  "pnpm typecheck"
+  "pnpm lint"
+  "pnpm test"
+  "pnpm build"
+)
 checks() { # DIR LOG
   local dir="$1" log="$2" cmd
-  while IFS= read -r cmd; do
+  for cmd in "${LANDING_CHECKS[@]}"; do
     echo "   \$ $cmd" | tee -a "$log"
     if ! (cd "$dir" && bash -c "$cmd") >> "$log" 2>&1; then
       echo "FAIL: \`$cmd\` failed in $dir" >&2; tail -40 "$log" >&2; return 1
     fi
-  done < <(python3 - "$dir/.github/workflows/checks.yml" <<'PY'
-import sys, yaml
-wf = yaml.safe_load(open(sys.argv[1]))
-for job in wf["jobs"].values():
-    for step in job["steps"]:
-        if "run" in step:
-            print(step["run"].strip())
-PY
-)
+  done
 }
 
 echo "── the offline bootstrap (testing/lib/bootstrap.sh)"
@@ -100,10 +105,10 @@ echo "   2 phases placed and landed"
 s01="$(git -C "$tree" rev-parse HEAD~1)"
 
 # ── 1. the product's one pull request ──────────────────────────────────────
-echo "── 01-product's landing, under the checks its PR waits on"
+echo "── 01-product's landing: install, the fixture render, typecheck, lint, test, build"
 git -C "$tree" worktree add -q "$scratch/at-01" "$s01"
 checks "$scratch/at-01" "$scratch/checks-01.log"
-# The first Checks build is done; its tree is not needed again, and the disk is shared.
+# The landing's build is done; its tree is not needed again, and the disk is shared.
 git -C "$tree" worktree remove --force "$scratch/at-01"
 
 # ── 2. the stage lane's steps, in the job's own tree ──────────────────────

@@ -8,7 +8,7 @@ name: Baseline CI
 # bucket before the Worker on a merge — and that the product it produces
 # installs, builds, deploys (dry), serves, and takes a cart.
 #
-# ─── WHY THIS IS NOT IN ci.yml OR checks.yml ──────────────────────────────
+# ─── WHY THIS IS NOT IN ci.yml ────────────────────────────────────────────
 #
 # `repo-blueprint.yaml`'s `github-workflows` module copies the WHOLE `.github`
 # directory into every site built from this repository. These jobs run
@@ -69,20 +69,26 @@ jobs:
   # floor too), and the placement tier (the offline bootstrap: both phases
   # placed and finished by the blueprint's own hooks, then the product's own
   # `orun plan` for the 01-product merge — the R2 apply before the Worker's
-  # deploy — under the product's lane pin, below).
+  # deploy — by an orun at or above the product's lane pin, below).
   blueprint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: sourceplane/orun-action@v1.2.0
         with:
-          version: v2.58.11
+          version: v2.88.0
       - uses: pnpm/action-setup@v4
         with:
           version: 10.12.1
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+          # This job installs nothing either: with no lockfile hook the offline
+          # bootstrap never runs pnpm, so there is no store, and the pnpm cache
+          # setup-node v5 turns on by itself (package.json names a packageManager)
+          # fails the job saving a path that does not exist whenever no earlier
+          # cache exists for the lockfile.
+          package-manager-cache: false
       - name: repo-blueprint.yaml, read by the pinned CLI
         run: |
           set -euo pipefail
@@ -98,34 +104,39 @@ jobs:
       - name: the leak gate — what a product carries
         run: bash testing/leak.test.sh
       # The placement tier ENDS with the product's own `orun plan` — what the
-      # product's ci.yml runs — so it runs under the product's lane pin, not
-      # the bootstrap floor. v2.58.11 plans a pull request with apps/web
-      # waiting on the R2 plan: it does not apply a dependsOn edge's
-      # `modeRules`. The lane pin does (advisory on a PR, enforced on main),
-      # and the test refuses an orun older than the pin rather than assert
-      # the wrong CLI's plan. Its placements are valid under either.
+      # product's ci.yml runs — so it needs an orun at the product's lane pin
+      # or newer: one older than v2.78.4 plans a pull request with apps/web
+      # waiting on the R2 plan, because it does not apply a dependsOn edge's
+      # `modeRules` (advisory on a PR, enforced on main). The test refuses an
+      # orun older than the pin rather than assert the wrong CLI's plan. The
+      # offline bootstrap before it reads the blueprint, which takes the
+      # bootstrap floor (v2.88.0: the one `secrets` reconcile, the task set-up
+      # in the background, the landings checked in the box), so this tier
+      # runs the floor, which is newer than the lane pin.
       - uses: sourceplane/orun-action@v1.2.0
         with:
-          version: v2.78.4
+          version: v2.88.0
       - name: placement — the offline bootstrap, and the product's own plan
         run: |
           git config --global user.email ci@example.invalid
           git config --global user.name "baseline ci"
           bash testing/placement.test.sh
 
-  # Tier 2. THE PRODUCT IT PRODUCES WORKS: its one landing under the checks
-  # its pull request waits on, the stage lane's own structure check, build
-  # (the live wiring render included), output check and dry deploy in the tree
-  # orun stages, and the built Worker served and smoke-tested with the
-  # component's own smoke command. Pinned at the product's lane version,
-  # because that is the orun the product's CI runs.
+  # Tier 2. THE PRODUCT IT PRODUCES WORKS: its one landing installed, its
+  # fixture rendered, type-checked, linted, tested and built, the stage lane's
+  # own structure check, build (the live wiring render included), output check
+  # and dry deploy in the tree orun stages, and the built Worker served and
+  # smoke-tested with the component's own smoke command. Pinned at the
+  # bootstrap floor (v2.88.0): the offline bootstrap reads the blueprint, and
+  # the floor is newer than the product's lane pin (v2.78.4), which is all the
+  # lane steps need.
   site:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: sourceplane/orun-action@v1.2.0
         with:
-          version: v2.78.4
+          version: v2.88.0
       - uses: pnpm/action-setup@v4
         with:
           version: 10.12.1
